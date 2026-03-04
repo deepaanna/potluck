@@ -1,29 +1,9 @@
 [gd_resource type="Resource" script_class="GameConfig" load_steps=2 format=3 uid="uid://config001"]
 
-[ext_resource type="Script" path="res://resources/game_config.gd" id="1"]
+[ext_resource type="Script" uid="uid://bfmq8gr8joru8" path="res://resources/game_config.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 game_name = "POT LUCK"
 game_id = "pot_luck"
-game_version = "1.0.0"
-admob_app_id = "ca-app-pub-3940256099942544~3347511713"
-admob_banner_id = "ca-app-pub-3940256099942544/6300978111"
-admob_interstitial_id = "ca-app-pub-3940256099942544/1033173712"
-admob_rewarded_id = "ca-app-pub-3940256099942544/5224354917"
-iap_remove_ads_id = "remove_ads"
-iap_product_ids = PackedStringArray("remove_ads")
-firebase_project_id = ""
-feedback_email = "feedback@example.com"
-app_store_url = ""
-rate_us_games_threshold = 5
-ad_min_level = 3
-ad_cooldown_seconds = 30.0
-ad_max_per_session = 10
-bag_size = 12
-boilover_threshold = 1.0
 heat_stages = PackedFloat32Array(0.25, 0.5, 0.75, 0.9)
-streak_bonus_per = 0.1
-streak_max_bonus = 2.0
-clean_pot_bonus = 1.5
-second_chance_heat_reduction = 0.5

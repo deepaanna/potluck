@@ -1,5 +1,5 @@
 ## Ingredient tile visual with flick/tap input handling.
-## Spawns at bottom, flicks upward to the pot.
+## Spawns at bottom, player flicks/taps upward to send to pot.
 extends Node2D
 
 signal flicked(tile: Node2D)
@@ -18,8 +18,9 @@ var _drag_velocity: Vector2 = Vector2.ZERO
 var _last_pos: Vector2 = Vector2.ZERO
 var _flying: bool = false
 
-const FLICK_THRESHOLD: float = -20.0  # Negative Y = upward (very low threshold)
+const FLICK_THRESHOLD: float = -10.0  # Negative Y = upward
 const TILE_SIZE: Vector2 = Vector2(280, 160)
+const HIT_PADDING: float = 80.0  # Extra tap area around tile
 
 
 func setup(data: IngredientData) -> void:
@@ -81,55 +82,77 @@ func _input(event: InputEvent) -> void:
 	if _flying:
 		return
 
-	if event is InputEventScreenTouch or event is InputEventMouseButton:
-		var pressed: bool = false
-		var event_pos: Vector2 = Vector2.ZERO
+	# Handle touch/click start and release
+	if event is InputEventScreenTouch:
+		var touch: InputEventScreenTouch = event as InputEventScreenTouch
+		var world_pos: Vector2 = _screen_to_world(touch.position)
+		if touch.pressed:
+			if _hit_test(world_pos):
+				_start_drag(touch.position)
+				get_viewport().set_input_as_handled()
+		elif _dragging:
+			_end_drag(touch.position)
+			get_viewport().set_input_as_handled()
 
-		if event is InputEventScreenTouch:
-			pressed = (event as InputEventScreenTouch).pressed
-			event_pos = (event as InputEventScreenTouch).position
-		elif event is InputEventMouseButton:
-			var mb: InputEventMouseButton = event as InputEventMouseButton
-			if mb.button_index == MOUSE_BUTTON_LEFT:
-				pressed = mb.pressed
-				event_pos = mb.position
-
-		# Convert to local space for hit test
-		var local: Vector2 = to_local(get_global_mouse_position()) if event is InputEventMouseButton else to_local(_get_global_from_screen(event_pos))
-		var hit_rect: Rect2 = Rect2(-TILE_SIZE / 2.0, TILE_SIZE)
-
-		if pressed and hit_rect.has_point(local):
-			_dragging = true
-			_drag_start = event_pos
-			_drag_start_pos = position
-			_last_pos = event_pos
-			_drag_velocity = Vector2.ZERO
-		elif not pressed and _dragging:
-			_dragging = false
-			# Check for flick (any upward velocity) or tap
-			if _drag_velocity.y < FLICK_THRESHOLD or event_pos.distance_to(_drag_start) < 20.0:
-				flicked.emit(self)
-
-	if event is InputEventScreenDrag or event is InputEventMouseMotion:
-		if not _dragging:
+	elif event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event as InputEventMouseButton
+		if mb.button_index != MOUSE_BUTTON_LEFT:
 			return
-		var event_pos: Vector2 = Vector2.ZERO
-		if event is InputEventScreenDrag:
-			event_pos = (event as InputEventScreenDrag).position
-		elif event is InputEventMouseMotion:
-			if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-				_dragging = false
-				return
-			event_pos = (event as InputEventMouseMotion).position
+		var world_pos: Vector2 = get_global_mouse_position()
+		if mb.pressed:
+			if _hit_test(world_pos):
+				_start_drag(mb.position)
+				get_viewport().set_input_as_handled()
+		elif _dragging:
+			_end_drag(mb.position)
+			get_viewport().set_input_as_handled()
 
-		_drag_velocity = event_pos - _last_pos
-		_last_pos = event_pos
+	# Handle drag motion
+	elif event is InputEventScreenDrag and _dragging:
+		var drag: InputEventScreenDrag = event as InputEventScreenDrag
+		_update_drag(drag.position)
 
-		# Allow slight vertical drag movement for feedback
-		var drag_offset: Vector2 = event_pos - _drag_start
-		position = _drag_start_pos + Vector2(0.0, clampf(drag_offset.y, -80.0, 20.0))
+	elif event is InputEventMouseMotion and _dragging:
+		if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_dragging = false
+			return
+		var motion: InputEventMouseMotion = event as InputEventMouseMotion
+		_update_drag(motion.position)
 
 
-func _get_global_from_screen(screen_pos: Vector2) -> Vector2:
-	var canvas_transform: Transform2D = get_canvas_transform()
-	return canvas_transform.affine_inverse() * screen_pos
+func _hit_test(world_pos: Vector2) -> bool:
+	var local: Vector2 = world_pos - global_position
+	var padded_half: Vector2 = (TILE_SIZE / 2.0) + Vector2(HIT_PADDING, HIT_PADDING)
+	return absf(local.x) < padded_half.x and absf(local.y) < padded_half.y
+
+
+func _start_drag(screen_pos: Vector2) -> void:
+	_dragging = true
+	_drag_start = screen_pos
+	_drag_start_pos = position
+	_last_pos = screen_pos
+	_drag_velocity = Vector2.ZERO
+
+
+func _end_drag(screen_pos: Vector2) -> void:
+	_dragging = false
+	# Flick if any upward velocity, or tap (small movement)
+	if _drag_velocity.y < FLICK_THRESHOLD or screen_pos.distance_to(_drag_start) < 30.0:
+		flicked.emit(self)
+	else:
+		# Return to original position
+		var tween: Tween = create_tween()
+		tween.tween_property(self, "position", _drag_start_pos, 0.15)
+
+
+func _update_drag(screen_pos: Vector2) -> void:
+	_drag_velocity = screen_pos - _last_pos
+	_last_pos = screen_pos
+
+	var drag_offset: Vector2 = screen_pos - _drag_start
+	position = _drag_start_pos + Vector2(0.0, clampf(drag_offset.y, -100.0, 30.0))
+
+
+func _screen_to_world(screen_pos: Vector2) -> Vector2:
+	var canvas_xform: Transform2D = get_canvas_transform()
+	return canvas_xform.affine_inverse() * screen_pos

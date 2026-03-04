@@ -8,6 +8,7 @@ extends Control
 @onready var menu_button: Button = %MenuButton
 @onready var outcome_label: Label = %OutcomeLabel
 @onready var stats_label: Label = %StatsLabel
+@onready var lifetime_stats_label: Label = %LifetimeStatsLabel
 
 
 func _ready() -> void:
@@ -24,8 +25,8 @@ func _ready() -> void:
 	play_again_button.pressed.connect(_on_play_again)
 	menu_button.pressed.connect(_on_menu)
 
-	# Show pot luck specific data
 	_show_pot_luck_stats()
+	_show_lifetime_stats()
 
 	# Try to show an interstitial ad
 	AdManager.show_interstitial()
@@ -68,9 +69,26 @@ func _show_pot_luck_stats() -> void:
 	stats_label.text = stats_text
 
 
+func _show_lifetime_stats() -> void:
+	var total_served: int = SaveManager.get_value("pot_luck.stats.total_dishes_served", 0) as int
+	var total_boilovers: int = SaveManager.get_value("pot_luck.stats.total_boilovers", 0) as int
+	var total_ingredients: int = SaveManager.get_value("pot_luck.stats.total_ingredients_used", 0) as int
+	var best_combo: float = SaveManager.get_value("pot_luck.stats.best_combo_multiplier", 1.0) as float
+	var perfect_pots: int = SaveManager.get_value("pot_luck.stats.perfect_pots", 0) as int
+
+	var text: String = ""
+	text += "Dishes Served: %d\n" % total_served
+	text += "Boilovers: %d\n" % total_boilovers
+	text += "Ingredients Used: %d\n" % total_ingredients
+	if perfect_pots > 0:
+		text += "Perfect Pots: %d\n" % perfect_pots
+	if best_combo > 1.0:
+		text += "Best Combo: x%.1f\n" % best_combo
+	lifetime_stats_label.text = text
+
+
 func _on_play_again() -> void:
 	AnalyticsManager.log_event("button_clicked", {"button": "play_again"})
-	GameManager.change_state(GameManager.GameState.MENU)
 	GameManager.goto_scene("res://scenes/game_scene.tscn")
 
 

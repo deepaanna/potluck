@@ -60,5 +60,5 @@ extends Resource
 @export var streak_max_bonus: float = 2.0
 ## Clean pot bonus multiplier when bag is emptied
 @export var clean_pot_bonus: float = 1.5
-## Heat reduction ratio when second chance is used (multiplied by current heat)
-@export var second_chance_heat_reduction: float = 0.5
+## Heat target ratio after second chance (0.7 = set heat to 70% of threshold)
+@export var second_chance_heat_reduction: float = 0.7

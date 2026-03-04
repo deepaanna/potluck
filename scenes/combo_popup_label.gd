@@ -1,4 +1,5 @@
 ## Floating combo name + multiplier text that animates up and fades out.
+class_name ComboPopupLabel
 extends Node2D
 
 @onready var _name_label: Label = $NameLabel

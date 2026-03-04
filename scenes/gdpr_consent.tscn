@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://gdpr001"]
 
-[ext_resource type="Script" path="res://scenes/gdpr_consent.gd" id="1"]
+[ext_resource type="Script" uid="uid://b5q73ty3hjr2p" path="res://scenes/gdpr_consent.gd" id="1"]
 
 [node name="GDPRConsent" type="Control"]
 layout_mode = 3
@@ -54,6 +54,7 @@ text = "Privacy Policy"
 horizontal_alignment = 1
 
 [node name="Description" type="Label" parent="Panel/MarginContainer/Content"]
+custom_minimum_size = Vector2(100, 100)
 layout_mode = 2
 text = "We use analytics to improve your experience. Your data is handled according to our privacy policy. Do you consent to data collection?"
 autowrap_mode = 2
@@ -65,12 +66,12 @@ alignment = 1
 
 [node name="DeclineButton" type="Button" parent="Panel/MarginContainer/Content/HBoxContainer"]
 unique_name_in_owner = true
-layout_mode = 2
 custom_minimum_size = Vector2(250, 80)
+layout_mode = 2
 text = "Decline"
 
 [node name="AcceptButton" type="Button" parent="Panel/MarginContainer/Content/HBoxContainer"]
 unique_name_in_owner = true
-layout_mode = 2
 custom_minimum_size = Vector2(250, 80)
+layout_mode = 2
 text = "Accept"

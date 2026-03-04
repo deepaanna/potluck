@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://menu001"]
 
-[ext_resource type="Script" path="res://scenes/main_menu.gd" id="1"]
-[ext_resource type="Script" path="res://ui/safe_area_margin.gd" id="2"]
+[ext_resource type="Script" uid="uid://dbs0620dtnwgk" path="res://scenes/main_menu.gd" id="1"]
+[ext_resource type="Script" uid="uid://cuytu0123of6o" path="res://ui/safe_area_margin.gd" id="2"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -33,21 +33,29 @@ theme_override_constants/separation = 48
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 96
-text = "My Game"
+text = "POTLUCK"
+horizontal_alignment = 1
+
+[node name="HighScoreLabel" type="Label" parent="SafeArea/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+theme_override_colors/font_color = Color(0.8, 0.75, 0.5, 1)
+text = ""
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="SafeArea/CenterContainer/VBoxContainer"]
-layout_mode = 2
 custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
 
 [node name="PlayButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
-layout_mode = 2
 custom_minimum_size = Vector2(400, 120)
+layout_mode = 2
 text = "Play"
 
 [node name="SettingsButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
-layout_mode = 2
 custom_minimum_size = Vector2(400, 100)
+layout_mode = 2
 text = "Settings"

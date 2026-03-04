@@ -23,8 +23,10 @@ func _ready() -> void:
 
 func _show_stage(stage: Stage) -> void:
 	_current_stage = stage
-	primary_button.pressed.disconnect(_on_primary) if primary_button.pressed.is_connected(_on_primary) else null
-	secondary_button.pressed.disconnect(_on_secondary) if secondary_button.pressed.is_connected(_on_secondary) else null
+	if primary_button.pressed.is_connected(_on_primary):
+		primary_button.pressed.disconnect(_on_primary)
+	if secondary_button.pressed.is_connected(_on_secondary):
+		secondary_button.pressed.disconnect(_on_secondary)
 	primary_button.pressed.connect(_on_primary)
 	secondary_button.pressed.connect(_on_secondary)
 

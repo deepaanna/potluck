@@ -136,7 +136,7 @@ func apply_second_chance() -> void:
 	if phase != Phase.BOILOVER:
 		return
 	second_chance_used = true
-	heat *= _config.second_chance_heat_reduction
+	heat = _config.second_chance_heat_reduction * _config.boilover_threshold
 	heat_changed.emit(heat, get_heat_stage())
 
 	if bag.is_empty():
