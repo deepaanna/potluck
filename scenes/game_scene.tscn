@@ -1,0 +1,112 @@
+[gd_scene load_steps=5 format=3 uid="uid://game001"]
+
+[ext_resource type="Script" path="res://scenes/game_scene.gd" id="1"]
+[ext_resource type="PackedScene" uid="uid://pot001" path="res://scenes/pot_visual.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://heat001" path="res://scenes/heat_meter.tscn" id="3"]
+[ext_resource type="Script" path="res://ui/safe_area_margin.gd" id="4"]
+
+[node name="GameScene" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(540, 960)
+anchor_mode = 0
+
+[node name="Background" type="ColorRect" parent="."]
+offset_right = 1080.0
+offset_bottom = 1920.0
+color = Color(0.08, 0.08, 0.12, 1)
+
+[node name="PotVisual" type="Node2D" parent="." instance=ExtResource("2")]
+position = Vector2(540, 750)
+
+[node name="TileSpawnPoint" type="Marker2D" parent="."]
+position = Vector2(540, 1500)
+
+[node name="PotTargetPoint" type="Marker2D" parent="."]
+position = Vector2(540, 700)
+
+[node name="ComboPopupContainer" type="Node2D" parent="."]
+
+[node name="HUDLayer" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="SafeArea" type="MarginContainer" parent="HUDLayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("4")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HUDLayer/SafeArea"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="TopBar" type="HBoxContainer" parent="HUDLayer/SafeArea/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="BagCountLabel" type="Label" parent="HUDLayer/SafeArea/VBoxContainer/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Bag: 12"
+
+[node name="Spacer" type="Control" parent="HUDLayer/SafeArea/VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ScoreLabel" type="Label" parent="HUDLayer/SafeArea/VBoxContainer/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 56
+text = "0"
+horizontal_alignment = 2
+
+[node name="MiddleSection" type="HBoxContainer" parent="HUDLayer/SafeArea/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MiddleSpacer" type="Control" parent="HUDLayer/SafeArea/VBoxContainer/MiddleSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="HeatMeterContainer" type="MarginContainer" parent="HUDLayer/SafeArea/VBoxContainer/MiddleSection"]
+layout_mode = 2
+theme_override_constants/margin_right = 20
+
+[node name="HeatMeter" type="Control" parent="HUDLayer/SafeArea/VBoxContainer/MiddleSection/HeatMeterContainer" instance=ExtResource("3")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="BottomBar" type="VBoxContainer" parent="HUDLayer/SafeArea/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="DrawPrompt" type="Label" parent="HUDLayer/SafeArea/VBoxContainer/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "Tap to Draw!"
+horizontal_alignment = 1
+visible = false
+
+[node name="IngredientPreview" type="Label" parent="HUDLayer/SafeArea/VBoxContainer/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = ""
+horizontal_alignment = 1
+
+[node name="StopButton" type="Button" parent="HUDLayer/SafeArea/VBoxContainer/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 100)
+text = "Serve Dish!"
+visible = false
+
+[node name="BannerAdSpacer" type="Control" parent="HUDLayer/SafeArea/VBoxContainer/BottomBar"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 60)

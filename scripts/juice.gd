@@ -1,0 +1,96 @@
+## Visual juice effects for CanvasItem nodes.
+## Provides squash & stretch, flash, pulse, and pop-in animations.
+class_name Juice
+extends RefCounted
+
+## Squash and stretch effect — great for landings and impacts
+static func squash_stretch(node: CanvasItem, squash_amount: float = 0.3, duration: float = 0.2) -> Tween:
+	if not is_instance_valid(node):
+		return null
+
+	_kill_tweens(node, "scale")
+	var original_scale: Vector2 = node.scale
+	var tween: Tween = node.create_tween()
+
+	# Squash
+	tween.tween_property(node, "scale", Vector2(
+		original_scale.x * (1.0 + squash_amount),
+		original_scale.y * (1.0 - squash_amount)
+	), duration * 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+	# Stretch
+	tween.tween_property(node, "scale", Vector2(
+		original_scale.x * (1.0 - squash_amount * 0.5),
+		original_scale.y * (1.0 + squash_amount * 0.5)
+	), duration * 0.3).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+	# Return to original
+	tween.tween_property(node, "scale", original_scale, duration * 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+
+	_track_tween(node, "scale", tween)
+	return tween
+
+
+## Flash the node's modulate color
+static func flash(node: CanvasItem, color: Color = Color.WHITE, duration: float = 0.15) -> Tween:
+	if not is_instance_valid(node):
+		return null
+
+	_kill_tweens(node, "modulate")
+	var original_modulate: Color = node.modulate
+	var tween: Tween = node.create_tween()
+
+	tween.tween_property(node, "modulate", color, duration * 0.3)
+	tween.tween_property(node, "modulate", original_modulate, duration * 0.7)
+
+	_track_tween(node, "modulate", tween)
+	return tween
+
+
+## Pulse the node's scale up and back
+static func pulse(node: CanvasItem, scale_factor: float = 1.2, duration: float = 0.3) -> Tween:
+	if not is_instance_valid(node):
+		return null
+
+	_kill_tweens(node, "scale")
+	var original_scale: Vector2 = node.scale
+	var tween: Tween = node.create_tween()
+
+	tween.tween_property(node, "scale", original_scale * scale_factor, duration * 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(node, "scale", original_scale, duration * 0.6).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+
+	_track_tween(node, "scale", tween)
+	return tween
+
+
+## Pop-in animation from zero scale with overshoot
+static func pop_in(node: CanvasItem, duration: float = 0.4, delay: float = 0.0) -> Tween:
+	if not is_instance_valid(node):
+		return null
+
+	_kill_tweens(node, "scale")
+	var target_scale: Vector2 = node.scale
+	node.scale = Vector2.ZERO
+	var tween: Tween = node.create_tween()
+
+	if delay > 0.0:
+		tween.tween_interval(delay)
+
+	tween.tween_property(node, "scale", target_scale, duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+	_track_tween(node, "scale", tween)
+	return tween
+
+
+## Kill any previous juice tween on this node+property via metadata tracking
+static func _kill_tweens(node: CanvasItem, property: String) -> void:
+	var meta_key: String = "_juice_tween_%s" % property
+	if node.has_meta(meta_key):
+		var old_tween: Tween = node.get_meta(meta_key) as Tween
+		if is_instance_valid(old_tween) and old_tween.is_valid():
+			old_tween.kill()
+
+
+static func _track_tween(node: CanvasItem, property: String, tween: Tween) -> void:
+	var meta_key: String = "_juice_tween_%s" % property
+	node.set_meta(meta_key, tween)
