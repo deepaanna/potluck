@@ -5,6 +5,7 @@ extends Node2D
 
 signal entered_pot(tile: Node2D)
 signal missed(tile: Node2D)
+signal flicked(tile: Node2D)
 
 enum State { IN_BAG, DRAWN, FLICKED, IN_POT }
 
@@ -168,7 +169,9 @@ func on_pot_entered() -> void:
 	state = State.IN_POT
 	set_physics_process(false)
 	_stop_idle_bob()
-	Juice.squash_stretch(self, 0.4, 0.2)
+	var tween: Tween = create_tween()
+	tween.tween_property(self, "scale", Vector2.ZERO, 0.15) \
+		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	entered_pot.emit(self)
 
 
@@ -181,6 +184,7 @@ func _hit_test(world_pos: Vector2) -> bool:
 func _begin_drag(screen_pos: Vector2) -> void:
 	_stop_idle_bob()
 	_dragging = true
+	rotation = 0.0
 	_drag_positions.clear()
 	_drag_times.clear()
 	_record_drag(screen_pos)
@@ -188,8 +192,11 @@ func _begin_drag(screen_pos: Vector2) -> void:
 
 
 func _update_drag(screen_pos: Vector2) -> void:
+	var prev_pos: Vector2 = _drag_positions[_drag_positions.size() - 1] if _drag_positions.size() > 0 else screen_pos
 	_record_drag(screen_pos)
 	position = _screen_to_world(screen_pos)
+	var delta_x: float = screen_pos.x - prev_pos.x
+	rotation = clampf(delta_x * 0.005, -0.3, 0.3)
 
 
 func _record_drag(screen_pos: Vector2) -> void:
@@ -213,6 +220,7 @@ func _release_drag() -> void:
 	_flick_timer = 0.0
 	set_physics_process(true)
 	queue_redraw()
+	flicked.emit(self)
 
 
 func _compute_flick_velocity() -> Vector2:

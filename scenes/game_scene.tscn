@@ -1,8 +1,16 @@
-[gd_scene load_steps=4 format=3 uid="uid://game001"]
+[gd_scene load_steps=6 format=3 uid="uid://game001"]
 
 [ext_resource type="Script" path="res://scenes/game_scene.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://gpot001" path="res://game/pot_visual.tscn" id="2"]
 [ext_resource type="Script" path="res://ui/safe_area_margin.gd" id="3"]
+[ext_resource type="Shader" path="res://shaders/heat_vignette.gdshader" id="4"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = ExtResource("4")
+shader_parameter/heat_intensity = 0.0
+shader_parameter/vignette_color = Color(0.9, 0.15, 0.05, 1)
+shader_parameter/radius = 0.8
+shader_parameter/softness = 0.4
 
 [node name="GameScene" type="Node2D"]
 script = ExtResource("1")
@@ -22,6 +30,23 @@ position = Vector2(540, 1500)
 position = Vector2(540, 550)
 
 [node name="ComboPopupContainer" type="Node2D" parent="."]
+
+[node name="FlickTrail" type="Line2D" parent="."]
+z_index = -1
+width = 6.0
+default_color = Color(1, 1, 1, 0.6)
+
+[node name="VignetteRect" type="ColorRect" parent="."]
+z_index = 10
+offset_right = 1080.0
+offset_bottom = 1920.0
+mouse_filter = 2
+material = SubResource("ShaderMaterial_vignette")
+color = Color(0, 0, 0, 0)
+
+[node name="SizzlePlayer" type="AudioStreamPlayer" parent="."]
+bus = &"SFX"
+autoplay = false
 
 [node name="HUDLayer" type="CanvasLayer" parent="."]
 layer = 5
@@ -66,6 +91,15 @@ theme_override_font_sizes/font_size = 36
 theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1)
 text = ""
 horizontal_alignment = 1
+
+[node name="TutorialLabel" type="Label" parent="HUDLayer/SafeArea/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(0.6, 0.8, 1.0, 1)
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="Middle" type="HBoxContainer" parent="HUDLayer/SafeArea/VBox"]
 layout_mode = 2

@@ -10,9 +10,17 @@ extends Control
 @onready var stats_label: Label = %StatsLabel
 @onready var lifetime_stats_label: Label = %LifetimeStatsLabel
 
+var _was_daily: bool = false
+
 
 func _ready() -> void:
 	AnalyticsManager.log_screen("game_over")
+
+	# Check if the game just played was a daily challenge
+	var pot_luck_data: Dictionary = {}
+	if GameManager.has_meta("pot_luck_data"):
+		pot_luck_data = GameManager.get_meta("pot_luck_data") as Dictionary
+	_was_daily = pot_luck_data.get("mode", "endless") == "daily"
 
 	var score: int = GameManager.score
 	var high_score: int = SaveManager.get_value("high_score", 0) as int
@@ -21,6 +29,12 @@ func _ready() -> void:
 	score_label.text = "Score: %s" % Utils.format_number(score)
 	high_score_label.text = "Best: %s" % Utils.format_number(high_score)
 	new_high_score_label.visible = is_new_high_score
+
+	if _was_daily:
+		play_again_button.text = "Try Daily Again"
+		var daily_best: int = DailyChallenge.get_today_best()
+		if daily_best > 0:
+			high_score_label.text = "Daily Best: %s" % Utils.format_number(daily_best)
 
 	play_again_button.pressed.connect(_on_play_again)
 	menu_button.pressed.connect(_on_menu)
@@ -89,6 +103,10 @@ func _show_lifetime_stats() -> void:
 
 func _on_play_again() -> void:
 	AnalyticsManager.log_event("button_clicked", {"button": "play_again"})
+	if _was_daily:
+		GameManager.set_meta("game_mode", "daily")
+	else:
+		GameManager.set_meta("game_mode", "endless")
 	GameManager.goto_scene("res://scenes/game_scene.tscn")
 
 

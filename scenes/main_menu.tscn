@@ -27,7 +27,7 @@ layout_mode = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="SafeArea/CenterContainer"]
 layout_mode = 2
-theme_override_constants/separation = 48
+theme_override_constants/separation = 24
 
 [node name="TitleLabel" type="Label" parent="SafeArea/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
@@ -45,17 +45,43 @@ text = ""
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="SafeArea/CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 80)
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
 [node name="PlayButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 120)
 layout_mode = 2
+theme_override_font_sizes/font_size = 42
 text = "Play"
+
+[node name="DailyButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 100)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+text = "Daily Challenge"
+
+[node name="DailyBestLabel" type="Label" parent="SafeArea/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.7, 0.75, 0.5, 1)
+text = ""
+horizontal_alignment = 1
+visible = false
+
+[node name="RecipeButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 100)
+layout_mode = 2
+theme_override_font_sizes/font_size = 36
+text = "Recipe Book  (0/0)"
 
 [node name="SettingsButton" type="Button" parent="SafeArea/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 100)
 layout_mode = 2
+theme_override_font_sizes/font_size = 36
 text = "Settings"
