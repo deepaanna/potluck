@@ -5,6 +5,7 @@ extends Node
 signal state_changed(old_state: GameState, new_state: GameState)
 signal score_changed(new_score: int)
 signal scene_changed(scene_name: String)
+signal heat_updated(new_heat: float)
 
 enum GameState { MENU, PLAYING, PAUSED, GAME_OVER }
 
@@ -19,6 +20,12 @@ var current_state: GameState = GameState.MENU
 var score: int = 0
 var level: int = 1
 var config: GameConfig
+
+# Push-your-luck run state
+var current_heat: float = 0.0
+var ingredients_pulled: int = 0
+var combo_multiplier: float = 1.0
+var recent_ingredients: Array[String] = []
 
 var _scene_tree: SceneTree
 
@@ -59,7 +66,41 @@ func start_game() -> void:
 	score = 0
 	level = 1
 	score_changed.emit(score)
+	reset_run()
 	change_state(GameState.PLAYING)
+
+
+## Reset push-your-luck run state for a new round
+func reset_run() -> void:
+	current_heat = 0.0
+	ingredients_pulled = 0
+	combo_multiplier = 1.0
+	recent_ingredients.clear()
+
+
+## Track an ingredient being added to the pot
+func add_ingredient(data: IngredientData) -> void:
+	current_heat += data.heat
+	ingredients_pulled += 1
+	recent_ingredients.append(data.id)
+	heat_updated.emit(current_heat)
+
+
+## Log and handle boilover event
+func boil_over() -> void:
+	AnalyticsManager.log_event("boilover_gm", {
+		"heat": current_heat,
+		"ingredients": ingredients_pulled,
+	})
+
+
+## Log and finalize a served dish
+func serve_dish(final_score: int) -> void:
+	AnalyticsManager.log_event("dish_served_gm", {
+		"score": final_score,
+		"ingredients": ingredients_pulled,
+		"combo_multiplier": combo_multiplier,
+	})
 
 
 ## Add points to the current score

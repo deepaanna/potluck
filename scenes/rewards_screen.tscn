@@ -1,0 +1,99 @@
+[gd_scene load_steps=3 format=3 uid="uid://rewards001"]
+
+[ext_resource type="Script" path="res://scenes/rewards_screen.gd" id="1"]
+[ext_resource type="Script" path="res://ui/safe_area_margin.gd" id="2"]
+
+[node name="RewardsScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.06, 0.1, 1)
+
+[node name="BackgroundArt" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+modulate = Color(1, 1, 1, 0.15)
+expand_mode = 1
+stretch_mode = 6
+
+[node name="VFXLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2")
+
+[node name="VBox" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderLabel" type="Label" parent="SafeArea/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "Round Results"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="SafeArea/VBox"]
+layout_mode = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="SafeArea/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="CardList" type="VBoxContainer" parent="SafeArea/VBox/ScrollContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="ButtonBar" type="HBoxContainer" parent="SafeArea/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="PlayAgainButton" type="Button" parent="SafeArea/VBox/ButtonBar"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(350, 90)
+theme_override_font_sizes/font_size = 40
+theme_type_variation = &"PrimaryButton"
+text = "Cook Again"
+
+[node name="MenuButton" type="Button" parent="SafeArea/VBox/ButtonBar"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(350, 90)
+theme_override_font_sizes/font_size = 34
+text = "Menu"

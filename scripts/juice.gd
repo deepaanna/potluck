@@ -82,6 +82,44 @@ static func pop_in(node: CanvasItem, duration: float = 0.4, delay: float = 0.0) 
 	return tween
 
 
+## Animate a Label's text counting from one number to another
+static func count_up(label: Label, from: int, to: int, duration: float = 0.6, delay: float = 0.0) -> Tween:
+	if not is_instance_valid(label):
+		return null
+
+	var tween: Tween = label.create_tween()
+	if delay > 0.0:
+		tween.tween_interval(delay)
+
+	var value_dict: Dictionary = {"v": float(from)}
+	label.text = Utils.format_number(from)
+	tween.tween_method(func(val: float) -> void:
+		value_dict["v"] = val
+		label.text = Utils.format_number(int(val))
+	, float(from), float(to), duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+	return tween
+
+
+## Scale from large to normal with overshoot — dramatic reveal
+static func slam_in(node: CanvasItem, duration: float = 0.3, delay: float = 0.0) -> Tween:
+	if not is_instance_valid(node):
+		return null
+
+	_kill_tweens(node, "scale")
+	var target_scale: Vector2 = node.scale
+	node.scale = target_scale * 2.5
+	var tween: Tween = node.create_tween()
+
+	if delay > 0.0:
+		tween.tween_interval(delay)
+
+	tween.tween_property(node, "scale", target_scale, duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+	_track_tween(node, "scale", tween)
+	return tween
+
+
 ## Kill any previous juice tween on this node+property via metadata tracking
 static func _kill_tweens(node: CanvasItem, property: String) -> void:
 	var meta_key: String = "_juice_tween_%s" % property

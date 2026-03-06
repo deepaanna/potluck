@@ -139,7 +139,7 @@ func _setup_layers() -> void:
 	add_child(_transition_layer)
 
 	_transition_rect = ColorRect.new()
-	_transition_rect.color = Color.BLACK
+	_transition_rect.color = Color(0.02, 0.02, 0.04)
 	_transition_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_transition_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_transition_rect.modulate.a = 0.0

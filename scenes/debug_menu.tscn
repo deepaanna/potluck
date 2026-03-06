@@ -1,18 +1,18 @@
-[gd_scene load_steps=3 format=3 uid="uid://set001"]
+[gd_scene load_steps=3 format=3 uid="uid://debug001"]
 
-[ext_resource type="Script" path="res://scenes/settings.gd" id="1"]
+[ext_resource type="Script" path="res://scenes/debug_menu.gd" id="1"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup"]
 content_margin_left = 32.0
 content_margin_top = 32.0
 content_margin_right = 32.0
 content_margin_bottom = 32.0
-bg_color = Color(0.11, 0.11, 0.17, 1)
+bg_color = Color(0.14, 0.1, 0.1, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.28, 0.28, 0.4, 0.8)
+border_color = Color(0.6, 0.2, 0.2, 0.8)
 corner_radius_top_left = 20
 corner_radius_top_right = 20
 corner_radius_bottom_right = 20
@@ -20,7 +20,7 @@ corner_radius_bottom_left = 20
 shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 8
 
-[node name="Settings" type="Control"]
+[node name="DebugMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -47,10 +47,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -400.0
-offset_top = -350.0
-offset_right = 400.0
-offset_bottom = 350.0
+offset_left = -420.0
+offset_top = -450.0
+offset_right = 420.0
+offset_bottom = 450.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
@@ -65,66 +65,61 @@ theme_override_constants/margin_bottom = 40
 [node name="Content" type="VBoxContainer" parent="Panel/MarginContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 20
 
 [node name="Title" type="Label" parent="Panel/MarginContainer/Content"]
 layout_mode = 2
-text = "Settings"
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+text = "DEBUG MENU"
 horizontal_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/Content"]
 layout_mode = 2
 
-[node name="SFXRow" type="HBoxContainer" parent="Panel/MarginContainer/Content"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Panel/MarginContainer/Content/SFXRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Sound Effects"
-
-[node name="SFXToggle" type="CheckButton" parent="Panel/MarginContainer/Content/SFXRow"]
+[node name="StatusLabel" type="Label" parent="Panel/MarginContainer/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-button_pressed = true
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 2
 
-[node name="MusicRow" type="HBoxContainer" parent="Panel/MarginContainer/Content"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Panel/MarginContainer/Content/MusicRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Music"
-
-[node name="MusicToggle" type="CheckButton" parent="Panel/MarginContainer/Content/MusicRow"]
+[node name="ResetProgressButton" type="Button" parent="Panel/MarginContainer/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-button_pressed = true
+custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 30
+text = "Reset All Progress"
 
-[node name="HapticsRow" type="HBoxContainer" parent="Panel/MarginContainer/Content"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="Panel/MarginContainer/Content/HapticsRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "Haptics"
-
-[node name="HapticsToggle" type="CheckButton" parent="Panel/MarginContainer/Content/HapticsRow"]
+[node name="ResetRecipesButton" type="Button" parent="Panel/MarginContainer/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-button_pressed = true
+custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 30
+text = "Reset Recipes Only"
+
+[node name="UnlockRecipesButton" type="Button" parent="Panel/MarginContainer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 30
+text = "Unlock All Recipes"
+
+[node name="SetScoreButton" type="Button" parent="Panel/MarginContainer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 80)
+theme_override_font_sizes/font_size = 30
+text = "Set High Score to 999"
 
 [node name="HSeparator2" type="HSeparator" parent="Panel/MarginContainer/Content"]
 layout_mode = 2
-
-[node name="RestoreButton" type="Button" parent="Panel/MarginContainer/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-custom_minimum_size = Vector2(0, 70)
-text = "Restore Purchases"
 
 [node name="CloseButton" type="Button" parent="Panel/MarginContainer/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 70)
+theme_override_font_sizes/font_size = 30
 text = "Close"

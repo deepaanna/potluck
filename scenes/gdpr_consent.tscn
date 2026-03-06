@@ -1,6 +1,24 @@
-[gd_scene load_steps=2 format=3 uid="uid://gdpr001"]
+[gd_scene load_steps=3 format=3 uid="uid://gdpr001"]
 
 [ext_resource type="Script" uid="uid://b5q73ty3hjr2p" path="res://scenes/gdpr_consent.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup"]
+content_margin_left = 32.0
+content_margin_top = 32.0
+content_margin_right = 32.0
+content_margin_bottom = 32.0
+bg_color = Color(0.11, 0.11, 0.17, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.28, 0.4, 0.8)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 8
 
 [node name="GDPRConsent" type="Control"]
 layout_mode = 3
@@ -35,6 +53,7 @@ offset_right = 400.0
 offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
 
 [node name="MarginContainer" type="MarginContainer" parent="Panel"]
 layout_mode = 2
@@ -74,4 +93,5 @@ text = "Decline"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(250, 80)
 layout_mode = 2
+theme_type_variation = &"PrimaryButton"
 text = "Accept"

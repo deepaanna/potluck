@@ -5,6 +5,7 @@ extends RefCounted
 static var _ingredients: Dictionary = {}
 static var _combos: Array[ComboData] = []
 static var _initialized: bool = false
+static var _next_sprite_index: int = 0
 
 
 static func _ensure_init() -> void:
@@ -54,7 +55,10 @@ static func find_new_combos(pot_ids: Array[String], new_id: String) -> Array[Com
 
 
 static func _add(id: String, display_name: String, points: int, heat: float, rarity: IngredientData.Rarity, cuisine: IngredientData.Cuisine, color: Color) -> void:
-	_ingredients[id] = IngredientData.create(id, display_name, points, heat, rarity, cuisine, color)
+	var data: IngredientData = IngredientData.create(id, display_name, points, heat, rarity, cuisine, color)
+	data.sprite_index = _next_sprite_index
+	_next_sprite_index += 1
+	_ingredients[id] = data
 
 
 static func _init_ingredients() -> void:

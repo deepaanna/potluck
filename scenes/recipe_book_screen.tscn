@@ -64,6 +64,11 @@ theme_override_colors/font_color = Color(0.7, 0.75, 0.85, 1)
 text = "0 / 0 Recipes Discovered"
 horizontal_alignment = 1
 
+[node name="ProgressBarDraw" type="Control" parent="SafeArea/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 12)
+
 [node name="MasterBadge" type="Label" parent="SafeArea/VBox"]
 unique_name_in_owner = true
 layout_mode = 2

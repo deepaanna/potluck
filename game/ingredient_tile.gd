@@ -12,6 +12,9 @@ enum State { IN_BAG, DRAWN, FLICKED, IN_POT }
 @onready var _area: Area2D = $Area2D
 @onready var _rect: ColorRect = $ColorRect
 @onready var _label: Label = $ColorRect/Label
+@onready var _sprite: Sprite2D = $Sprite2D
+@onready var _name_badge: Label = $NameBadge
+@onready var _frame_art: TextureRect = $FrameArt
 
 var ingredient_data: IngredientData
 var state: State = State.IN_BAG
@@ -23,16 +26,48 @@ var _drag_times: PackedFloat64Array = PackedFloat64Array()
 var _spawn_pos: Vector2 = Vector2.ZERO
 var _flick_timer: float = 0.0
 var _bob_tween: Tween = null
+var _use_sprite: bool = false
 
 const GRAVITY: float = 1200.0
 const MAX_FLICK_TIME: float = 2.5
 const TILE_SIZE: float = 120.0
 const DRAG_SAMPLE_COUNT: int = 6
 const MIN_FLICK_SPEED: float = 200.0
+const CELLS_PER_SHEET: int = 5
+const CELL_SIZE: float = 464.0
+const SHEET_PATHS: PackedStringArray = [
+	"res://assets/sprites/sheet1.png",
+	"res://assets/sprites/sheet2.png",
+	"res://assets/sprites/sheet3.png",
+	"res://assets/sprites/sheet4.png",
+	"res://assets/sprites/sheet5.png",
+]
 
 
 func setup(data: IngredientData) -> void:
 	ingredient_data = data
+
+
+func _load_sprite_from_sheet() -> bool:
+	var idx: int = ingredient_data.sprite_index
+	var sheet_num: int = idx / CELLS_PER_SHEET
+	var col: int = idx % CELLS_PER_SHEET
+
+	if sheet_num >= SHEET_PATHS.size():
+		return false
+
+	var texture: Texture2D = load(SHEET_PATHS[sheet_num]) as Texture2D
+	if texture == null:
+		return false
+
+	var atlas: AtlasTexture = AtlasTexture.new()
+	atlas.atlas = texture
+	atlas.region = Rect2(col * CELL_SIZE, 0, CELL_SIZE, CELL_SIZE)
+
+	_sprite.texture = atlas
+	_sprite.scale = Vector2.ONE * (TILE_SIZE / CELL_SIZE)
+	_sprite.visible = true
+	return true
 
 
 func _ready() -> void:
@@ -42,22 +77,36 @@ func _ready() -> void:
 	if ingredient_data == null:
 		return
 
-	_rect.color = ingredient_data.color
-	_rect.size = Vector2(TILE_SIZE, TILE_SIZE)
-	_rect.position = Vector2(-TILE_SIZE / 2.0, -TILE_SIZE / 2.0)
+	# Try loading sprite from sheet
+	var sprite_loaded: bool = _load_sprite_from_sheet()
 
-	# Make label fill the rect
-	_label.position = Vector2.ZERO
-	_label.size = Vector2(TILE_SIZE, TILE_SIZE)
-	_label.add_theme_font_size_override("font_size", 36)
+	_use_sprite = sprite_loaded
+	if sprite_loaded:
+		_rect.visible = false
+	else:
+		# Fallback to rounded colored tile (drawn in _draw)
+		_rect.visible = false  # Hide raw ColorRect, we draw rounded version
+		_label.position = Vector2(-TILE_SIZE / 2.0, -TILE_SIZE / 2.0)
+		_label.size = Vector2(TILE_SIZE, TILE_SIZE)
+		_label.add_theme_font_size_override("font_size", 36)
+		var abbrev: String = ingredient_data.display_name.substr(0, 3).to_upper()
+		_label.text = abbrev
+		var lum: float = ingredient_data.color.r * 0.299 + ingredient_data.color.g * 0.587 + ingredient_data.color.b * 0.114
+		_label.add_theme_color_override("font_color", Color.BLACK if lum > 0.5 else Color.WHITE)
 
-	# 3-letter abbreviation
-	var abbrev: String = ingredient_data.display_name.substr(0, 3).to_upper()
-	_label.text = abbrev
-
-	# Text color: dark for light backgrounds, white for dark
-	var lum: float = ingredient_data.color.r * 0.299 + ingredient_data.color.g * 0.587 + ingredient_data.color.b * 0.114
-	_label.add_theme_color_override("font_color", Color.BLACK if lum > 0.5 else Color.WHITE)
+	# Name badge below tile (always visible in DRAWN state)
+	_name_badge.text = ingredient_data.display_name
+	_name_badge.position = Vector2(-60, TILE_SIZE / 2.0 + 4)
+	_name_badge.size = Vector2(120, 30)
+	_name_badge.add_theme_font_size_override("font_size", 20)
+	_name_badge.add_theme_color_override("font_color", Color.WHITE)
+	# Dark semi-transparent background via a StyleBoxFlat
+	var badge_style: StyleBoxFlat = StyleBoxFlat.new()
+	badge_style.bg_color = Color(0.0, 0.0, 0.0, 0.6)
+	badge_style.set_corner_radius_all(4)
+	badge_style.content_margin_left = 4.0
+	badge_style.content_margin_right = 4.0
+	_name_badge.add_theme_stylebox_override("normal", badge_style)
 
 
 func reveal(spawn_position: Vector2) -> void:
@@ -73,15 +122,37 @@ func reveal(spawn_position: Vector2) -> void:
 
 
 func _draw() -> void:
-	if state != State.DRAWN or _dragging:
+	if state != State.DRAWN:
 		return
-	# Draw downward arrow below tile — visual hint toward the pot
-	var arrow_y: float = TILE_SIZE / 2.0 + 20.0
+
+	var half := TILE_SIZE / 2.0
+
+	if not _dragging:
+		# Shadow ellipse below tile
+		draw_circle(Vector2(0, half + 10), 30, Color(0, 0, 0, 0.12))
+
+	# Rounded ColorRect fallback (when no sprite loaded)
+	if not _use_sprite and ingredient_data != null:
+		var tile_rect := Rect2(-half, -half, TILE_SIZE, TILE_SIZE)
+		draw_rect(tile_rect, ingredient_data.color, true)  # Godot 4 doesn't support rounded draw_rect, so we draw it flat
+		# We keep the label on top for abbreviation text
+
+	# Tile border (colored frame around the tile)
+	if ingredient_data != null:
+		var border_rect := Rect2(-half - 2, -half - 2, TILE_SIZE + 4, TILE_SIZE + 4)
+		var border_col := Color(ingredient_data.color, 0.6)
+		draw_rect(border_rect, border_col, false, 2.0)
+
+	if _dragging:
+		return
+
+	# Draw downward arrow below tile + name badge — visual hint toward the pot
+	var arrow_y: float = half + 50.0
 	var arrow_w: float = 14.0
 	var arrow_h: float = 22.0
 	var col: Color = Color(1.0, 0.9, 0.3, 0.7)
 	# Stem
-	draw_line(Vector2(0, TILE_SIZE / 2.0 + 6.0), Vector2(0, arrow_y), col, 3.0)
+	draw_line(Vector2(0, half + 38.0), Vector2(0, arrow_y), col, 3.0)
 	# Triangle
 	draw_colored_polygon(PackedVector2Array([
 		Vector2(-arrow_w, arrow_y),
@@ -169,6 +240,7 @@ func on_pot_entered() -> void:
 	state = State.IN_POT
 	set_physics_process(false)
 	_stop_idle_bob()
+	_name_badge.visible = false
 	var tween: Tween = create_tween()
 	tween.tween_property(self, "scale", Vector2.ZERO, 0.15) \
 		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
@@ -219,6 +291,7 @@ func _release_drag() -> void:
 	state = State.FLICKED
 	_flick_timer = 0.0
 	set_physics_process(true)
+	_name_badge.visible = false
 	queue_redraw()
 	flicked.emit(self)
 
@@ -256,6 +329,7 @@ func _return_to_spawn() -> void:
 	tween.tween_property(self, "position", _spawn_pos, 0.3)
 	tween.tween_callback(_start_idle_bob)
 
+	_name_badge.visible = true
 	queue_redraw()
 	missed.emit(self)
 

@@ -24,14 +24,17 @@ const SFX_SIZZLE_LOOP: String = "res://assets/audio/sfx/sizzle_loop.wav"
 @onready var _flick_trail: Line2D = $FlickTrail
 
 # HUD
+@onready var _bag_icon: TextureRect = %BagIcon
 @onready var _bag_label: Label = %BagCountLabel
 @onready var _score_label: Label = %ScoreLabel
+@onready var _preview_panel: PanelContainer = %PreviewPanel
 @onready var _preview_label: Label = %IngredientPreview
 @onready var _flick_prompt: Label = %FlickPrompt
 @onready var _stop_button: Button = %StopButton
 @onready var _heat_draw: Control = %HeatMeterDraw
 @onready var _pot_dots: Control = %PotDots
 @onready var _tutorial_label: Label = %TutorialLabel
+@onready var _mode_badge: Label = %ModeBadge
 
 var _engine: PotLuckEngine = PotLuckEngine.new()
 var _current_tile: IngredientTile = null
@@ -52,6 +55,10 @@ var _tutorial_step: int = 0
 var _original_bag_size: int = 12
 var _show_heat_debug: bool = false
 
+# Enriched metadata tracking
+var _new_recipes_this_round: Array[String] = []
+var _previous_high_score: int = 0
+
 # Game mode
 var _game_mode: String = "endless"  # "endless" or "daily"
 var _daily_bag: Array[IngredientData] = []
@@ -67,11 +74,43 @@ func _ready() -> void:
 		_game_mode = GameManager.get_meta("game_mode") as String
 		GameManager.remove_meta("game_mode")
 
+	# Load bag icon if available
+	var bag_tex: Texture2D = load("res://assets/sprites/bag.png") as Texture2D
+	if bag_tex:
+		_bag_icon.texture = bag_tex
+		_bag_icon.visible = true
+
+	# Show mode badge for daily challenge
+	if _game_mode == "daily":
+		_mode_badge.text = "DAILY"
+		_mode_badge.visible = true
+		var badge_sb := StyleBoxFlat.new()
+		badge_sb.bg_color = Color(1.0, 0.85, 0.2, 0.15)
+		badge_sb.set_corner_radius_all(6)
+		badge_sb.content_margin_left = 6
+		badge_sb.content_margin_right = 6
+		_mode_badge.add_theme_stylebox_override("normal", badge_sb)
+	else:
+		_mode_badge.visible = false
+
+	# Preview panel style
+	var preview_sb := StyleBoxFlat.new()
+	preview_sb.bg_color = Color(0.08, 0.08, 0.14, 0.7)
+	preview_sb.set_corner_radius_all(10)
+	preview_sb.content_margin_left = 12
+	preview_sb.content_margin_right = 12
+	preview_sb.content_margin_top = 6
+	preview_sb.content_margin_bottom = 6
+	_preview_panel.add_theme_stylebox_override("panel", preview_sb)
+
 	_engine.setup(GameManager.config)
 	_connect_engine()
 
 	_stop_button.pressed.connect(_on_stop_pressed)
-	_stop_button.visible = false
+	_stop_button.visible = false  # Hidden until first ingredient added
+	_stop_button.disabled = true
+	_stop_button.modulate.a = 0.3
+	_stop_button.text = "Keep Cooking..."
 	_preview_label.text = ""
 	_flick_prompt.text = ""
 	_score_label.text = "0"
@@ -107,6 +146,10 @@ func _ready() -> void:
 		_tutorial_step = 0
 		_original_bag_size = GameManager.config.bag_size
 		GameManager.config.bag_size = 3
+
+	# Capture high score before this round modifies it
+	_previous_high_score = SaveManager.get_value("high_score", 0) as int
+	_new_recipes_this_round.clear()
 
 	_start_round()
 
@@ -149,8 +192,8 @@ func _process(delta: float) -> void:
 		# Fade out trail by removing points gradually
 		_flick_trail.remove_point(0)
 
-	# Heat meter redraw at > 0.8 for glow pulse
-	if _heat_ratio > 0.8:
+	# Heat meter redraw at > 0.6 for fill pulse and glow
+	if _heat_ratio > 0.6:
 		_heat_draw.queue_redraw()
 
 
@@ -158,6 +201,7 @@ func _process(delta: float) -> void:
 
 func _start_round() -> void:
 	_engine.reset()
+	GameManager.reset_run()
 
 	# Daily mode: use deterministic bag; normal mode: random bag
 	if _game_mode == "daily":
@@ -172,8 +216,13 @@ func _start_round() -> void:
 	_update_hud()
 	_pot_visual.set_heat(0.0)
 	_stop_button.visible = false
+	_stop_button.disabled = true
+	_stop_button.modulate.a = 0.3
+	_stop_button.text = "Keep Cooking..."
+	_stop_button.theme_type_variation = &""
 	_flick_prompt.text = ""
 	_preview_label.text = "Daily Challenge" if _game_mode == "daily" else ""
+	_preview_panel.visible = _game_mode == "daily"
 
 	# Reset polish state
 	_tension_timer = 0.0
@@ -208,8 +257,13 @@ func _on_ingredient_drawn(data: IngredientData) -> void:
 	_update_hud()
 
 	_preview_label.text = "%s  (+%d pts)" % [data.display_name, data.points]
+	_preview_panel.visible = true
 	_flick_prompt.text = "Drag it down into the pot!"
-	_stop_button.visible = false
+	# Disable serve button during draw/flick phase
+	_stop_button.disabled = true
+	_stop_button.modulate.a = 0.3
+	_stop_button.text = "Keep Cooking..."
+	_stop_button.theme_type_variation = &""
 
 	AudioManager.play_sfx_path(SFX_DRAW)
 
@@ -237,6 +291,8 @@ func _on_pot_landed(tile: IngredientTile) -> void:
 	_waiting_for_flick = false
 
 	_engine.add_to_pot()
+	if tile.ingredient_data != null:
+		GameManager.add_ingredient(tile.ingredient_data)
 	_pot_visual.play_splash()
 	AudioManager.play_sfx_path(SFX_SPLASH)
 	Utils.vibrate(15)
@@ -252,6 +308,10 @@ func _on_pot_landed(tile: IngredientTile) -> void:
 
 	# Score pulse
 	Juice.pulse(_score_label, 1.15, 0.2)
+
+	# Floating "+X" score popup
+	if tile.ingredient_data != null:
+		_spawn_score_popup(tile.ingredient_data.points, tile.ingredient_data.color)
 
 	# Clean up tile after shrink animation
 	var cleanup_timer: SceneTreeTimer = get_tree().create_timer(0.25)
@@ -276,14 +336,18 @@ func _on_tile_missed(_tile: IngredientTile) -> void:
 
 func _on_ingredient_added(_data: IngredientData) -> void:
 	_preview_label.text = ""
+	_preview_panel.visible = false
 	_flick_prompt.text = ""
 
 	if _engine.phase != PotLuckEngine.Phase.DECIDE:
 		return
 
-	# Show serve button with score
-	_stop_button.text = "Serve Dish!  (%s pts)" % Utils.format_number(_running_score)
+	# Enable serve button in DECIDE phase
 	_stop_button.visible = true
+	_stop_button.disabled = false
+	_stop_button.modulate.a = 1.0
+	_stop_button.text = "Serve Dish!  (%s pts)" % Utils.format_number(_running_score)
+	_stop_button.theme_type_variation = &"PrimaryButton"
 	Juice.pop_in(_stop_button, 0.2)
 
 	if _engine.bag.is_empty():
@@ -306,7 +370,7 @@ func _on_combo_triggered(combo: ComboData) -> void:
 	})
 
 	var popup: ComboPopupLabel = _combo_popup_scene.instantiate() as ComboPopupLabel
-	popup.position = Vector2(540, 1200)
+	popup.position = Vector2(540, 1050)
 	_combo_container.add_child(popup)
 	popup.setup(combo)
 	popup.animate()
@@ -315,9 +379,12 @@ func _on_combo_triggered(combo: ComboData) -> void:
 	if combo.multiplier > best:
 		SaveManager.set_value("pot_luck.stats.best_combo_multiplier", combo.multiplier)
 
+	GameManager.combo_multiplier *= combo.multiplier
+
 	# Recipe discovery via RecipeBook
 	var is_new: bool = RecipeBook.discover_recipe(combo.combo_name)
 	if is_new:
+		_new_recipes_this_round.append(combo.combo_name)
 		AnalyticsManager.log_event("recipe_discovered", {"combo_name": combo.combo_name})
 		_show_new_recipe_popup(combo)
 
@@ -331,9 +398,14 @@ func _on_combo_triggered(combo: ComboData) -> void:
 
 
 func _on_heat_changed(new_heat: float, _stage: int) -> void:
+	var prev_heat: float = _heat_ratio
 	_heat_ratio = clampf(new_heat / GameManager.config.boilover_threshold, 0.0, 1.0)
 	_pot_visual.set_heat(_heat_ratio)
 	_heat_draw.queue_redraw()
+
+	# Flash heat meter on increase to draw attention
+	if _heat_ratio > prev_heat:
+		Juice.flash(_heat_draw, Color.WHITE, 0.15)
 
 	# Update vignette shader
 	if _vignette_rect.material is ShaderMaterial:
@@ -345,12 +417,18 @@ func _on_heat_changed(new_heat: float, _stage: int) -> void:
 
 func _on_boilover() -> void:
 	AnalyticsManager.log_event("boilover")
+	GameManager.boil_over()
 	_pot_visual.play_boilover(_camera)
 	Utils.vibrate(200)
 	AudioManager.play_sfx_path(SFX_BOILOVER)
-	_stop_button.visible = false
+	_stop_button.visible = false  # Fully hide on boilover (round over)
 	_flick_prompt.text = ""
 	_preview_label.text = ""
+	_preview_panel.visible = false
+
+	# Max vignette on boilover
+	if _vignette_rect.material is ShaderMaterial:
+		(_vignette_rect.material as ShaderMaterial).set_shader_parameter("heat_intensity", 1.0)
 
 	# Stop sizzle
 	if _sizzle_player.playing:
@@ -370,21 +448,23 @@ func _on_boilover() -> void:
 
 
 func _on_dish_served(final_score: int) -> void:
+	GameManager.serve_dish(final_score)
 	AudioManager.play_sfx_path(SFX_SERVE)
 
 	# Stop sizzle
 	if _sizzle_player.playing:
 		_sizzle_player.stop()
 
-	# Score count-up tween
-	_displayed_score = 0.0
-	_score_label.text = "0"
+	# Score count-up tween (start from 60% for snappy feel)
+	var start_value: float = float(final_score) * 0.6
+	_displayed_score = start_value
+	_score_label.text = Utils.format_number(int(start_value))
 
 	if _score_countup_tween and _score_countup_tween.is_valid():
 		_score_countup_tween.kill()
 
 	_score_countup_tween = create_tween()
-	_score_countup_tween.tween_method(_update_score_display, 0.0, float(final_score), 1.0) \
+	_score_countup_tween.tween_method(_update_score_display, start_value, float(final_score), 0.5) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 	_score_countup_tween.tween_callback(func() -> void:
 		# Green flash + ding at completion
@@ -405,6 +485,7 @@ func _on_dish_served(final_score: int) -> void:
 
 func _on_bag_emptied() -> void:
 	_preview_label.text = "Clean Pot! x%.1f Bonus!" % GameManager.config.clean_pot_bonus
+	_preview_panel.visible = true
 	Juice.pulse(_score_label, 1.3, 0.3)
 
 
@@ -437,7 +518,8 @@ func _on_stop_pressed() -> void:
 		"ingredients_count": _engine.pot.size(),
 		"heat": _engine.heat,
 	})
-	_stop_button.visible = false
+	_stop_button.disabled = true
+	_stop_button.modulate.a = 0.3
 	_flick_prompt.text = ""
 	_engine.serve()
 
@@ -457,6 +539,8 @@ func _on_second_chance_accepted() -> void:
 
 	_stop_button.text = "Serve Dish!  (%s pts)" % Utils.format_number(_running_score)
 	_stop_button.visible = true
+	_stop_button.disabled = false
+	_stop_button.modulate.a = 1.0
 
 	if not _engine.bag.is_empty():
 		_flick_prompt.text = "Tap anywhere to draw next (%d left)" % _engine.bag.size()
@@ -471,9 +555,10 @@ func _on_second_chance_declined() -> void:
 # ── End game ─────────────────────────────────────────────────────────────
 
 func _end_game(final_score: int, was_boilover: bool) -> void:
-	_stop_button.visible = false
+	_stop_button.visible = false  # Fully hide when game ends
 	_flick_prompt.text = ""
 	_preview_label.text = ""
+	_preview_panel.visible = false
 
 	var ingredients_used: int = _engine.pot.size()
 	SaveManager.set_value("pot_luck.stats.total_ingredients_used",
@@ -506,6 +591,27 @@ func _end_game(final_score: int, was_boilover: bool) -> void:
 			"seed": DailyChallenge.get_daily_seed(),
 		})
 
+	# Build enriched combo data for rewards screen
+	var triggered_combos_data: Array[Dictionary] = []
+	for combo: ComboData in _engine.triggered_combos:
+		triggered_combos_data.append({
+			"combo_name": combo.combo_name,
+			"multiplier": combo.multiplier,
+			"is_penalty": combo.is_penalty,
+			"ingredient_a": combo.ingredient_a,
+			"ingredient_b": combo.ingredient_b,
+		})
+
+	# Build enriched ingredient data
+	var ingredients_data: Array[Dictionary] = []
+	for ingredient: IngredientData in _engine.pot:
+		ingredients_data.append({
+			"id": ingredient.id,
+			"display_name": ingredient.display_name,
+			"points": ingredient.points,
+			"color": ingredient.color,
+		})
+
 	GameManager.set_meta("pot_luck_data", {
 		"final_score": final_score,
 		"was_boilover": was_boilover,
@@ -515,6 +621,13 @@ func _end_game(final_score: int, was_boilover: bool) -> void:
 		"streak_bonus": _engine.get_streak_bonus(),
 		"bag_emptied": _engine.bag_was_emptied,
 		"mode": _game_mode,
+		"triggered_combos": triggered_combos_data,
+		"ingredients": ingredients_data,
+		"final_heat": clampf(_engine.heat / GameManager.config.boilover_threshold, 0.0, 1.0),
+		"second_chance_used": _engine.second_chance_used,
+		"new_recipes": _new_recipes_this_round.duplicate(),
+		"previous_high_score": _previous_high_score,
+		"pot_colors": _pot_colors,
 	})
 
 	GameManager.add_score(final_score)
@@ -525,6 +638,31 @@ func _end_game(final_score: int, was_boilover: bool) -> void:
 
 
 # ── Polish helpers ───────────────────────────────────────────────────────
+
+func _spawn_score_popup(points: int, color: Color) -> void:
+	var popup_label: Label = Label.new()
+	popup_label.text = "+%d" % points
+	popup_label.add_theme_font_size_override("font_size", 36)
+	popup_label.add_theme_color_override("font_color", color.lightened(0.3))
+	popup_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	popup_label.position = _pot_visual.position + Vector2(-50, -80)
+	popup_label.size = Vector2(100, 50)
+	popup_label.z_index = 20
+	add_child(popup_label)
+
+	# Scale pop + float up + fade out
+	popup_label.scale = Vector2(1.4, 1.4)
+	popup_label.pivot_offset = Vector2(50, 25)
+	var tween: Tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(popup_label, "scale", Vector2.ONE, 0.15) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(popup_label, "position:y", popup_label.position.y - 80.0, 0.6) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(popup_label, "modulate:a", 0.0, 0.3) \
+		.set_delay(0.3)
+	tween.chain().tween_callback(popup_label.queue_free)
+
 
 func _spawn_splash_particles(color: Color) -> void:
 	var particles: CPUParticles2D = CPUParticles2D.new()
@@ -563,7 +701,7 @@ func _show_new_recipe_popup(combo: ComboData) -> void:
 	new_label.add_theme_font_size_override("font_size", 44)
 	new_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.5))
 	new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	new_label.position = Vector2(340, 1100)
+	new_label.position = Vector2(340, 950)
 	new_label.size = Vector2(400, 60)
 	add_child(new_label)
 
@@ -600,7 +738,7 @@ func _draw_heat_meter() -> void:
 	var rect: Rect2 = _heat_draw.get_rect()
 	var w: float = rect.size.x
 	var h: float = rect.size.y
-	var bar_w: float = 40.0
+	var bar_w: float = 60.0
 	var bar_h: float = h - 80.0
 	var x: float = (w - bar_w) / 2.0
 	var y_top: float = 40.0
@@ -620,7 +758,26 @@ func _draw_heat_meter() -> void:
 			col = Color(0.9, 0.9, 0.2).lerp(Color(0.95, 0.4, 0.1), (_heat_ratio - 0.4) / 0.3)
 		else:
 			col = Color(0.95, 0.4, 0.1).lerp(Color(1.0, 0.1, 0.05), (_heat_ratio - 0.7) / 0.3)
+
+		# Pulsing fill alpha when heat > 0.6
+		if _heat_ratio > 0.6:
+			var pulse_a: float = 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
+			col.a = pulse_a
 		_heat_draw.draw_rect(Rect2(x, fill_y, bar_w, fill_h), col)
+
+	# Threshold tick marks at 25%, 50%, 75%, 90%
+	var thresholds: PackedFloat64Array = [0.25, 0.50, 0.75, 0.90]
+	for threshold: float in thresholds:
+		var tick_y: float = y_top + bar_h * (1.0 - threshold)
+		var tick_col: Color = Color(0.6, 0.6, 0.7, 0.5)
+		if threshold >= 0.90:
+			tick_col = Color(1.0, 0.2, 0.1, 0.8)
+		_heat_draw.draw_line(Vector2(x, tick_y), Vector2(x + bar_w, tick_y), tick_col, 2.0)
+
+	# "DANGER" text at 90% mark
+	var danger_y: float = y_top + bar_h * (1.0 - 0.90) - 2
+	_heat_draw.draw_string(ThemeDB.fallback_font, Vector2(x - 2, danger_y),
+		"DANGER", HORIZONTAL_ALIGNMENT_LEFT, bar_w + 4, 16, Color(1.0, 0.15, 0.05, 0.9))
 
 	# Pulsing glow border at high heat
 	if _heat_ratio > 0.8:
@@ -637,6 +794,10 @@ func _draw_heat_meter() -> void:
 		pct_text = "%.3f" % _heat_ratio
 	_heat_draw.draw_string(ThemeDB.fallback_font, Vector2(x, y_top - 8), pct_text,
 		HORIZONTAL_ALIGNMENT_LEFT, bar_w, 24, Color(0.8, 0.8, 0.8))
+
+	# "HEAT" label at the bottom of the meter
+	_heat_draw.draw_string(ThemeDB.fallback_font, Vector2(x, y_top + bar_h + 22),
+		"HEAT", HORIZONTAL_ALIGNMENT_LEFT, bar_w, 16, Color(0.45, 0.45, 0.55))
 
 
 # ── Custom draw: ingredient dots in pot ──────────────────────────────────

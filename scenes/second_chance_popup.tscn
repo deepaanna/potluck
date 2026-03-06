@@ -1,6 +1,24 @@
-[gd_scene load_steps=2 format=3 uid="uid://sc001"]
+[gd_scene load_steps=3 format=3 uid="uid://sc001"]
 
 [ext_resource type="Script" path="res://scenes/second_chance_popup.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup"]
+content_margin_left = 32.0
+content_margin_top = 32.0
+content_margin_right = 32.0
+content_margin_bottom = 32.0
+bg_color = Color(0.11, 0.11, 0.17, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.28, 0.4, 0.8)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 8
 
 [node name="SecondChancePopup" type="Control"]
 layout_mode = 3
@@ -35,6 +53,7 @@ offset_right = 420.0
 offset_bottom = 350.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_popup")
 
 [node name="MarginContainer" type="MarginContainer" parent="Panel"]
 layout_mode = 2
@@ -73,6 +92,11 @@ text = "Watch an ad to save your dish! 3..."
 horizontal_alignment = 1
 autowrap_mode = 2
 
+[node name="CountdownArc" type="Control" parent="Panel/MarginContainer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 70)
+
 [node name="Spacer" type="Control" parent="Panel/MarginContainer/Content"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 10)
@@ -82,6 +106,7 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 110)
 theme_override_font_sizes/font_size = 44
+theme_type_variation = &"DangerButton"
 text = "Save My Dish!"
 
 [node name="GiveUpButton" type="Button" parent="Panel/MarginContainer/Content"]
@@ -90,4 +115,5 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 80)
 theme_override_font_sizes/font_size = 32
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+flat = true
 text = "Give Up"

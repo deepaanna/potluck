@@ -12,6 +12,7 @@ var heat: float
 var rarity: Rarity
 var cuisine: Cuisine
 var color: Color
+var sprite_index: int = 0
 
 
 static func create(p_id: String, p_name: String, p_points: int, p_heat: float, p_rarity: Rarity, p_cuisine: Cuisine, p_color: Color) -> IngredientData:

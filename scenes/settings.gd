@@ -22,6 +22,24 @@ func _ready() -> void:
 	if not Utils.is_mobile():
 		haptics_toggle.get_parent().visible = false
 
+	# Alternating row backgrounds
+	var rows := [
+		sfx_toggle.get_parent(),
+		music_toggle.get_parent(),
+		haptics_toggle.get_parent(),
+	]
+	for i in rows.size():
+		if i % 2 == 0:
+			var bg := ColorRect.new()
+			bg.color = Color(0.13, 0.13, 0.19, 0.5)
+			bg.show_behind_parent = true
+			bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			bg.offset_left = -8
+			bg.offset_right = 8
+			bg.offset_top = -4
+			bg.offset_bottom = 4
+			rows[i].add_child(bg)
+
 
 func _load_settings() -> void:
 	sfx_toggle.button_pressed = SaveManager.get_value("settings.sfx_enabled", true) as bool

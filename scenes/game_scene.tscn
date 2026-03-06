@@ -67,11 +67,28 @@ theme_override_constants/separation = 0
 layout_mode = 2
 theme_override_constants/separation = 16
 
+[node name="BagIcon" type="TextureRect" parent="HUDLayer/SafeArea/VBox/TopBar"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(28, 28)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
 [node name="BagCountLabel" type="Label" parent="HUDLayer/SafeArea/VBox/TopBar"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 38
 text = "Bag: 12"
+
+[node name="ModeBadge" type="Label" parent="HUDLayer/SafeArea/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+text = ""
+visible = false
 
 [node name="Spacer" type="Control" parent="HUDLayer/SafeArea/VBox/TopBar"]
 layout_mode = 2
@@ -84,7 +101,15 @@ theme_override_font_sizes/font_size = 56
 text = "0"
 horizontal_alignment = 2
 
-[node name="IngredientPreview" type="Label" parent="HUDLayer/SafeArea/VBox"]
+[node name="TopBarSeparator" type="HSeparator" parent="HUDLayer/SafeArea/VBox"]
+layout_mode = 2
+
+[node name="PreviewPanel" type="PanelContainer" parent="HUDLayer/SafeArea/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+
+[node name="IngredientPreview" type="Label" parent="HUDLayer/SafeArea/VBox/PreviewPanel"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 36
@@ -112,7 +137,7 @@ size_flags_horizontal = 3
 [node name="HeatMeterDraw" type="Control" parent="HUDLayer/SafeArea/VBox/Middle"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(70, 0)
+custom_minimum_size = Vector2(90, 0)
 
 [node name="BottomBar" type="VBoxContainer" parent="HUDLayer/SafeArea/VBox"]
 layout_mode = 2
@@ -136,8 +161,7 @@ unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 100)
 theme_override_font_sizes/font_size = 42
-text = "Serve Dish!"
-visible = false
+text = "Keep Cooking..."
 
 [node name="BannerAdSpacer" type="Control" parent="HUDLayer/SafeArea/VBox/BottomBar"]
 layout_mode = 2

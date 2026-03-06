@@ -8,10 +8,12 @@ signal second_chance_declined
 @onready var _title_label: Label = %TitleLabel
 @onready var _score_lost_label: Label = %ScoreLostLabel
 @onready var _countdown_label: Label = %CountdownLabel
+@onready var _countdown_arc: Control = %CountdownArc
 @onready var _save_button: Button = %SaveButton
 @onready var _give_up_button: Button = %GiveUpButton
 
-var _countdown: float = 3.0
+const COUNTDOWN_MAX: float = 5.0
+var _countdown: float = COUNTDOWN_MAX
 var _resolved: bool = false
 var _pulse_tween: Tween = null
 
@@ -28,7 +30,8 @@ func _ready() -> void:
 	else:
 		_score_lost_label.text = "Your dish is ruined!"
 
-	_countdown_label.text = "Watch an ad to save your dish! 3..."
+	_countdown_label.text = "Watch an ad to save your dish! 5..."
+	_countdown_arc.draw.connect(_draw_countdown_arc)
 
 	if not AdManager.is_rewarded_ready():
 		_save_button.text = "No Ad Available"
@@ -48,6 +51,7 @@ func _process(delta: float) -> void:
 
 	if secs > 0:
 		_countdown_label.text = "Watch an ad to save your dish! %d..." % secs
+		_countdown_arc.queue_redraw()
 	else:
 		_resolved = true
 		set_process(false)
@@ -108,3 +112,27 @@ func _stop_button_pulse() -> void:
 		_pulse_tween = null
 	if is_instance_valid(_save_button):
 		_save_button.modulate = Color.WHITE
+
+
+func _draw_countdown_arc() -> void:
+	var center := Vector2(_countdown_arc.size.x / 2.0, _countdown_arc.size.y / 2.0)
+	var radius := 30.0
+	var line_width := 4.0
+	var ratio := clampf(_countdown / COUNTDOWN_MAX, 0.0, 1.0)
+
+	# Background ring
+	_countdown_arc.draw_arc(center, radius, 0, TAU, 64, Color(0.2, 0.2, 0.3, 0.4), line_width)
+
+	# Active arc: sweeps from top (270deg) clockwise
+	var start_angle := -PI / 2.0
+	var end_angle := start_angle + TAU * ratio
+
+	# Color transitions: white -> yellow -> red as time depletes
+	var arc_color: Color
+	if ratio > 0.5:
+		arc_color = Color.WHITE.lerp(Color(1, 0.9, 0.2), (1.0 - ratio) * 2.0)
+	else:
+		arc_color = Color(1, 0.9, 0.2).lerp(Color(1, 0.2, 0.1), (0.5 - ratio) * 2.0)
+
+	if ratio > 0.01:
+		_countdown_arc.draw_arc(center, radius, start_angle, end_angle, 64, arc_color, line_width)

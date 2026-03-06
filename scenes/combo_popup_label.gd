@@ -4,6 +4,10 @@ extends Node2D
 
 @onready var _name_label: Label = $NameLabel
 @onready var _multiplier_label: Label = $MultiplierLabel
+@onready var _bg_panel: ColorRect = $BackgroundPanel
+@onready var _sparkles: CPUParticles2D = $Sparkles
+
+var _is_penalty: bool = false
 
 
 func setup(combo: ComboData) -> void:
@@ -12,18 +16,25 @@ func setup(combo: ComboData) -> void:
 
 	_name_label.text = combo.combo_name
 	_multiplier_label.text = "x%.1f" % combo.multiplier
+	_is_penalty = combo.is_penalty
 
 	if combo.is_penalty:
 		_name_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2))
 		_multiplier_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2))
+		_bg_panel.color = Color(0.14, 0.04, 0.04, 0.85)
 	else:
 		_name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
 		_multiplier_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1))
+		_bg_panel.color = Color(0.06, 0.04, 0.14, 0.85)
 
 
 func animate() -> void:
 	scale = Vector2.ZERO
 	modulate.a = 1.0
+
+	# Fire sparkles for bonus combos only
+	if not _is_penalty:
+		_sparkles.emitting = true
 
 	var tween: Tween = create_tween()
 	# Pop in
