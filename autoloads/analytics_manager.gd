@@ -19,9 +19,13 @@ var _valid_events: PackedStringArray = [
 	"iap_initiated", "iap_completed", "iap_failed",
 	"button_clicked", "screen_viewed",
 	"gdpr_consent_given", "gdpr_consent_declined",
-	"ingredient_drawn", "stop_decision", "boilover",
+	"ingredient_drawn", "stop_decision", "boilover", "boilover_gm",
 	"combo_triggered", "second_chance_used", "second_chance_declined",
-	"dish_served", "cuisine_selected",
+	"dish_served", "dish_served_gm", "cuisine_selected",
+	"recipe_discovered", "daily_challenge_completed",
+	"ability_used", "ad_refill_used",
+	"tutorial_step_completed",
+	"high_score_rate_tapped", "high_score_share_tapped",
 ]
 
 var _required_params: Dictionary = {

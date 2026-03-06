@@ -39,6 +39,19 @@ func play_sfx(stream: AudioStream, volume_db: float = 0.0, pitch: float = 1.0) -
 	player.play()
 
 
+## Play a sound effect with heat-based pitch scaling.
+## Pitch = 1.0 + current_heat / 200.0 (e.g. heat 100 → pitch 1.5)
+func play_sfx_heated(stream: AudioStream, volume_db: float = 0.0) -> void:
+	var heat_pitch: float = 1.0 + GameManager.current_heat / 200.0
+	play_sfx(stream, volume_db, heat_pitch)
+
+
+## Play a sound effect from a file path with heat-based pitch scaling.
+func play_sfx_path_heated(path: String, volume_db: float = 0.0) -> void:
+	var heat_pitch: float = 1.0 + GameManager.current_heat / 200.0
+	play_sfx_path(path, volume_db, heat_pitch)
+
+
 ## Play a sound effect from a file path
 func play_sfx_path(path: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	var stream: AudioStream = load(path) as AudioStream

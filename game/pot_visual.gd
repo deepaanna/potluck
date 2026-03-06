@@ -5,13 +5,19 @@ extends Node2D
 signal ingredient_landed(tile: IngredientTile)
 
 @onready var _sprite: Sprite2D = $Sprite2D
+@onready var _bubble_anim: AnimatedSprite2D = $BubbleAnim
 @onready var _catch_area: Area2D = $CatchArea
 @onready var _bubbles: CPUParticles2D = $Bubbles
 @onready var _boilover_burst: CPUParticles2D = $BoiloverBurst
+@onready var _steam: GPUParticles2D = $SteamParticles
 
+var _tex_empty: Texture2D = preload("res://assets/sprites/cauldron_empty.png")
+var _tex_full: Texture2D = preload("res://assets/sprites/cauldron_full.png")
 var _heat: float = 0.0
 var _base_scale: Vector2 = Vector2.ONE
 var _pulse_tween: Tween = null
+var _cuisine_tint: Color = Color.WHITE
+var _is_full: bool = false
 
 
 func _ready() -> void:
@@ -19,6 +25,9 @@ func _ready() -> void:
 	_catch_area.area_entered.connect(_on_area_entered)
 	_bubbles.emitting = false
 	_boilover_burst.emitting = false
+	_steam.emitting = false
+	_bubble_anim.play(&"idle")
+	set_full(false)
 	set_heat(0.0)
 
 
@@ -39,7 +48,7 @@ func set_heat(value: float) -> void:
 		var t: float = clampf((_heat - 0.8) / 0.2, 0.0, 1.0)
 		tint = Color(1.0, 0.5, 0.3).lerp(Color(1.0, 0.25, 0.15), t)
 
-	_sprite.modulate = tint
+	_sprite.modulate = tint * _cuisine_tint
 
 	# Bubble particles — increase with heat
 	if _heat > 0.15:
@@ -50,6 +59,16 @@ func set_heat(value: float) -> void:
 	else:
 		_bubbles.emitting = false
 
+	# Steam — emit above 30% heat, amount scales with heat
+	if _heat > 0.3:
+		_steam.emitting = true
+		_steam.amount_ratio = clampf((_heat - 0.3) / 0.7, 0.0, 1.0)
+	else:
+		_steam.emitting = false
+
+	# Bubble animation speed scales with heat
+	_bubble_anim.speed_scale = lerpf(0.6, 2.5, clampf(_heat, 0.0, 1.0))
+
 	# Pulse at high heat
 	if _heat >= 0.8:
 		_start_danger_pulse()
@@ -57,7 +76,22 @@ func set_heat(value: float) -> void:
 		_stop_danger_pulse()
 
 
+func set_cuisine_tint(tint: Color) -> void:
+	_cuisine_tint = tint
+	# Re-apply current heat to blend with new tint
+	set_heat(_heat)
+
+
+func set_full(full: bool) -> void:
+	if full == _is_full:
+		return
+	_is_full = full
+	_sprite.texture = _tex_full if full else _tex_empty
+
+
 func play_splash() -> void:
+	if not _is_full:
+		set_full(true)
 	Juice.squash_stretch(self, 0.12, 0.2)
 
 

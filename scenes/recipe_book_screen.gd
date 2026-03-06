@@ -39,13 +39,43 @@ func _ready() -> void:
 
 
 func _build_recipe_list(recipes: Array[Dictionary]) -> void:
+	# Group by cuisine
+	var cuisine_groups: Dictionary = {"basic": [], "italian": [], "japanese": []}
 	for recipe: Dictionary in recipes:
-		var is_discovered: bool = recipe["discovered"] as bool
-		var card: PanelContainer = _create_recipe_card(recipe, is_discovered)
-		_recipe_list.add_child(card)
+		var cuisine: String = recipe.get("cuisine", "basic") as String
+		if not cuisine_groups.has(cuisine):
+			cuisine_groups[cuisine] = []
+		(cuisine_groups[cuisine] as Array).append(recipe)
+
+	var cuisine_order: Array = ["basic", "italian", "japanese"]
+	var cuisine_labels: Dictionary = {"basic": "Basic", "italian": "Italian", "japanese": "Japanese"}
+	var cuisine_unlock_levels: Dictionary = {"basic": 1, "italian": 5, "japanese": 15}
+
+	for cuisine: String in cuisine_order:
+		var group: Array = cuisine_groups.get(cuisine, []) as Array
+		if group.is_empty():
+			continue
+
+		# Section header
+		var header: Label = Label.new()
+		var is_locked: bool = (group[0] as Dictionary).get("locked", false) as bool
+		if is_locked:
+			header.text = "%s Cuisine (Unlock at Level %d)" % [cuisine_labels[cuisine], cuisine_unlock_levels[cuisine]]
+			header.add_theme_color_override("font_color", Color(0.4, 0.4, 0.45))
+		else:
+			header.text = "%s Cuisine" % cuisine_labels[cuisine]
+			header.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		header.add_theme_font_size_override("font_size", 24)
+		_recipe_list.add_child(header)
+
+		for recipe: Dictionary in group:
+			var is_discovered: bool = recipe["discovered"] as bool
+			var locked: bool = recipe.get("locked", false) as bool
+			var card: PanelContainer = _create_recipe_card(recipe, is_discovered, locked)
+			_recipe_list.add_child(card)
 
 
-func _create_recipe_card(recipe: Dictionary, is_discovered: bool) -> PanelContainer:
+func _create_recipe_card(recipe: Dictionary, is_discovered: bool, is_locked: bool = false) -> PanelContainer:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(0, 100)
 
@@ -138,7 +168,7 @@ func _create_recipe_card(recipe: Dictionary, is_discovered: bool) -> PanelContai
 			mult_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.4))
 		hbox.add_child(mult_label)
 	else:
-		# Locked appearance
+		# Locked or undiscovered appearance
 		var lock_label: Label = Label.new()
 		lock_label.text = "???"
 		lock_label.add_theme_font_size_override("font_size", 36)
@@ -147,7 +177,11 @@ func _create_recipe_card(recipe: Dictionary, is_discovered: bool) -> PanelContai
 		hbox.add_child(lock_label)
 
 		var hint_label: Label = Label.new()
-		hint_label.text = "Undiscovered"
+		if is_locked:
+			var unlock_level: int = recipe.get("unlock_level", 1) as int
+			hint_label.text = "Unlock at Level %d" % unlock_level
+		else:
+			hint_label.text = "Undiscovered"
 		hint_label.add_theme_font_size_override("font_size", 28)
 		hint_label.add_theme_color_override("font_color", Color(0.35, 0.35, 0.4))
 		hbox.add_child(hint_label)

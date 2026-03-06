@@ -14,6 +14,8 @@ const SFX_SERVE: String = "res://assets/audio/sfx/serve.wav"
 const SFX_DING: String = "res://assets/audio/sfx/ding.wav"
 const SFX_SECOND_CHANCE: String = "res://assets/audio/sfx/second_chance.wav"
 const SFX_SIZZLE_LOOP: String = "res://assets/audio/sfx/sizzle_loop.wav"
+const SFX_SIZZLE: String = "res://assets/audio/sfx/sizzle.wav"
+const BGM_GAME: String = "res://assets/audio/music/game_bgm.wav"
 
 @onready var _camera: Camera2D = $Camera2D
 @onready var _pot_visual := $PotVisual
@@ -41,6 +43,7 @@ var _current_tile: IngredientTile = null
 var _tile_scene: PackedScene = preload("res://game/ingredient_tile.tscn")
 var _combo_popup_scene: PackedScene = preload("res://scenes/combo_popup_label.tscn")
 var _second_chance_scene: PackedScene = preload("res://scenes/second_chance_popup.tscn")
+var _high_score_scene: PackedScene = preload("res://scenes/high_score_popup.tscn")
 var _running_score: int = 0
 var _heat_ratio: float = 0.0
 var _pot_colors: PackedColorArray = PackedColorArray()
@@ -62,6 +65,13 @@ var _previous_high_score: int = 0
 # Game mode
 var _game_mode: String = "endless"  # "endless" or "daily"
 var _daily_bag: Array[IngredientData] = []
+
+# Ability system
+var _ability_manager: AbilityManager = AbilityManager.new()
+var _ability_buttons: Dictionary = {}  # AbilityManager.AbilityType -> Button
+var _ability_container: HBoxContainer = null
+var _peek_overlay: PanelContainer = null
+var _abilities_used_this_round: int = 0
 
 
 func _ready() -> void:
@@ -150,6 +160,11 @@ func _ready() -> void:
 	# Capture high score before this round modifies it
 	_previous_high_score = SaveManager.get_value("high_score", 0) as int
 	_new_recipes_this_round.clear()
+	_abilities_used_this_round = 0
+
+	# Set up ability manager
+	_ability_manager.setup(GameManager.chef_level)
+	_create_ability_ui()
 
 	_start_round()
 
@@ -203,12 +218,19 @@ func _start_round() -> void:
 	_engine.reset()
 	GameManager.reset_run()
 
-	# Daily mode: use deterministic bag; normal mode: random bag
+	# Apply cuisine theme
+	UIManager.swap_cuisine_theme(UIManager.get_active_cuisine_name())
+	var ct: CuisineTheme = UIManager.get_cuisine_theme()
+	if ct:
+		_pot_visual.set_cuisine_tint(ct.pot_tint)
+
+	# Daily mode: use deterministic bag; normal mode: balanced bag
 	if _game_mode == "daily":
 		_daily_bag = DailyChallenge.get_daily_bag()
 		_engine.bag = _daily_bag.duplicate()
 	else:
-		_engine.fill_bag()
+		var unlocked: Array = SaveManager.get_value("pot_luck.unlocked_cuisines", ["basic"]) as Array
+		_engine.fill_bag_balanced(GameManager.chef_level, unlocked)
 
 	_running_score = 0
 	_heat_ratio = 0.0
@@ -236,6 +258,9 @@ func _start_round() -> void:
 
 	_heat_draw.queue_redraw()
 	_pot_dots.queue_redraw()
+
+	# Start game BGM with crossfade from menu music
+	AudioManager.play_music_path(BGM_GAME, -6.0, true)
 
 	await get_tree().create_timer(0.4).timeout
 	_draw_next()
@@ -266,6 +291,7 @@ func _on_ingredient_drawn(data: IngredientData) -> void:
 	_stop_button.theme_type_variation = &""
 
 	AudioManager.play_sfx_path(SFX_DRAW)
+	_update_ability_buttons()
 
 	# Reset trail for new tile
 	_flick_trail.clear_points()
@@ -284,6 +310,10 @@ func _on_ingredient_drawn(data: IngredientData) -> void:
 		_show_tutorial_hint("Drag the ingredient down\ninto the pot!")
 		_tutorial_step = 1
 
+	# Onboarding popup: flick tutorial
+	if TutorialManager.try_trigger("flick"):
+		await TutorialManager.step_dismissed
+
 
 func _on_pot_landed(tile: IngredientTile) -> void:
 	if tile != _current_tile:
@@ -295,6 +325,7 @@ func _on_pot_landed(tile: IngredientTile) -> void:
 		GameManager.add_ingredient(tile.ingredient_data)
 	_pot_visual.play_splash()
 	AudioManager.play_sfx_path(SFX_SPLASH)
+	AudioManager.play_sfx_path_heated(SFX_SIZZLE)
 	Utils.vibrate(15)
 
 	# Splash particles
@@ -339,6 +370,11 @@ func _on_ingredient_added(_data: IngredientData) -> void:
 	_preview_panel.visible = false
 	_flick_prompt.text = ""
 
+	# Onboarding popup: heat warning after first ingredient lands (before DECIDE guard)
+	if _engine.pot.size() == 1:
+		if TutorialManager.try_trigger("heat"):
+			await TutorialManager.step_dismissed
+
 	if _engine.phase != PotLuckEngine.Phase.DECIDE:
 		return
 
@@ -352,15 +388,25 @@ func _on_ingredient_added(_data: IngredientData) -> void:
 
 	if _engine.bag.is_empty():
 		_flick_prompt.text = "Bag empty — Serve your dish!"
+		# Re-show clean pot bonus if bag was emptied (signal fires before ingredient_added)
+		if _engine.bag_was_emptied:
+			_preview_label.text = "Clean Pot! x%.1f Bonus!" % GameManager.config.clean_pot_bonus
+			_preview_panel.visible = true
 	else:
 		_flick_prompt.text = "Tap anywhere to draw next (%d left)" % _engine.bag.size()
 
 	_update_hud()
+	_update_ability_buttons()
 
 	# Tutorial hint step 3
 	if _is_tutorial and _tutorial_step == 2:
 		_show_tutorial_hint("Serve now for safe points,\nor keep adding for more!")
 		_tutorial_step = 3
+
+	# Onboarding popup: serve lesson when DECIDE phase entered with 2+ ingredients
+	if _engine.pot.size() >= 2:
+		if TutorialManager.try_trigger("serve"):
+			await TutorialManager.step_dismissed
 
 
 func _on_combo_triggered(combo: ComboData) -> void:
@@ -394,6 +440,7 @@ func _on_combo_triggered(combo: ComboData) -> void:
 		ScreenShake.shake(_camera, 8.0, 0.2)
 	else:
 		AudioManager.play_sfx_path(SFX_COMBO, 0.0, randf_range(0.9, 1.1))
+		AudioManager.play_sfx_path(SFX_DING, -3.0, randf_range(0.95, 1.05))
 		Juice.flash(_pot_visual, Color(1.0, 1.0, 0.5), 0.2)
 
 
@@ -439,6 +486,9 @@ func _on_boilover() -> void:
 		_current_tile = null
 
 	if not _engine.second_chance_used:
+		# Onboarding popup: revive tutorial before second-chance popup
+		if TutorialManager.try_trigger("revive"):
+			await TutorialManager.step_dismissed
 		await get_tree().create_timer(0.6).timeout
 		AudioManager.play_sfx_path(SFX_SECOND_CHANCE)
 		_show_second_chance()
@@ -474,12 +524,6 @@ func _on_dish_served(final_score: int) -> void:
 
 	await _score_countup_tween.finished
 
-	# Restore bag_size if tutorial
-	if _is_tutorial:
-		GameManager.config.bag_size = _original_bag_size
-		_is_tutorial = false
-		SaveManager.set_value("pot_luck.tutorial_completed", true)
-
 	_end_game(final_score, false)
 
 
@@ -493,6 +537,8 @@ func _on_bag_emptied() -> void:
 
 func _on_tile_flicked(_tile: IngredientTile) -> void:
 	AudioManager.play_sfx_path(SFX_FLICK, 0.0, randf_range(0.9, 1.1))
+	AudioManager.play_sfx_path("res://assets/audio/sfx/whoosh.wav", -3.0, randf_range(0.9, 1.1))
+	Utils.vibrate(50)
 
 
 # ── Tap-to-draw in DECIDE phase ─────────────────────────────────────────
@@ -555,10 +601,21 @@ func _on_second_chance_declined() -> void:
 # ── End game ─────────────────────────────────────────────────────────────
 
 func _end_game(final_score: int, was_boilover: bool) -> void:
+	TutorialManager.try_complete()
+
+	# Restore bag_size if tutorial (covers both serve and boilover paths)
+	if _is_tutorial:
+		GameManager.config.bag_size = _original_bag_size
+		_is_tutorial = false
+		SaveManager.set_value("pot_luck.tutorial_completed", true)
+
 	_stop_button.visible = false  # Fully hide when game ends
 	_flick_prompt.text = ""
 	_preview_label.text = ""
 	_preview_panel.visible = false
+
+	# Fade out game BGM
+	AudioManager.stop_music(true)
 
 	var ingredients_used: int = _engine.pot.size()
 	SaveManager.set_value("pot_luck.stats.total_ingredients_used",
@@ -612,6 +669,20 @@ func _end_game(final_score: int, was_boilover: bool) -> void:
 			"color": ingredient.color,
 		})
 
+	# Award XP
+	var round_xp_data: Dictionary = {
+		"was_boilover": was_boilover,
+		"final_score": final_score,
+		"combos_count": _engine.triggered_combos.size(),
+		"bag_emptied": _engine.bag_was_emptied,
+		"new_recipes_count": _new_recipes_this_round.size(),
+	}
+	var xp_result: Dictionary = GameManager.award_xp(round_xp_data)
+
+	# Track abilities used
+	SaveManager.set_value("pot_luck.stats.total_abilities_used",
+		(SaveManager.get_value("pot_luck.stats.total_abilities_used", 0) as int) + _abilities_used_this_round)
+
 	GameManager.set_meta("pot_luck_data", {
 		"final_score": final_score,
 		"was_boilover": was_boilover,
@@ -628,10 +699,22 @@ func _end_game(final_score: int, was_boilover: bool) -> void:
 		"new_recipes": _new_recipes_this_round.duplicate(),
 		"previous_high_score": _previous_high_score,
 		"pot_colors": _pot_colors,
+		"xp_earned": xp_result.get("xp_earned", 0),
+		"leveled_up": xp_result.get("leveled_up", false),
+		"old_level": xp_result.get("old_level", 1),
+		"new_level": xp_result.get("new_level", 1),
+		"current_xp": xp_result.get("current_xp", 0),
+		"xp_for_next": xp_result.get("xp_for_next", 25),
+		"unlocks": xp_result.get("unlocks", []),
 	})
 
 	GameManager.add_score(final_score)
 	GameManager.end_game()
+
+	# Show high score popup if new personal best
+	if final_score > 0 and final_score > _previous_high_score:
+		var hs_popup: BasePopup = UIManager.show_popup(_high_score_scene, {"score": final_score})
+		await hs_popup.dismissed
 
 	await get_tree().create_timer(0.5).timeout
 	GameManager.goto_scene("res://scenes/game_over.tscn")
@@ -817,3 +900,320 @@ func _draw_pot_dots() -> void:
 	for i: int in range(count):
 		var cx: float = start_x + i * spacing + spacing / 2.0
 		_pot_dots.draw_circle(Vector2(cx, cy), dot_size / 2.0, _pot_colors[i])
+
+
+# ── Ability UI ──────────────────────────────────────────────────────────
+
+func _create_ability_ui() -> void:
+	# Remove previous if re-creating (free the canvas layer parent too)
+	if _ability_container != null and is_instance_valid(_ability_container):
+		var old_canvas: Node = _ability_container.get_parent()
+		if old_canvas != null and old_canvas is CanvasLayer and is_instance_valid(old_canvas):
+			old_canvas.queue_free()
+		else:
+			_ability_container.queue_free()
+		_ability_container = null
+	_ability_buttons.clear()
+
+	# Check if any abilities are unlocked
+	var has_any: bool = _ability_manager.is_unlocked(AbilityManager.AbilityType.PEEK) \
+		or _ability_manager.is_unlocked(AbilityManager.AbilityType.COOL_DOWN) \
+		or _ability_manager.is_unlocked(AbilityManager.AbilityType.SWAP)
+	if not has_any:
+		return
+
+	# Create container positioned below the pot, above the serve button
+	_ability_container = HBoxContainer.new()
+	_ability_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	_ability_container.add_theme_constant_override("separation", 16)
+	_ability_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_ability_container.offset_top = -220
+	_ability_container.offset_bottom = -120
+	_ability_container.offset_left = -180
+	_ability_container.offset_right = 180
+
+	# Create buttons for each unlocked ability
+	var types: Array = [
+		AbilityManager.AbilityType.PEEK,
+		AbilityManager.AbilityType.COOL_DOWN,
+		AbilityManager.AbilityType.SWAP,
+	]
+	for ability_type: int in types:
+		if not _ability_manager.is_unlocked(ability_type as AbilityManager.AbilityType):
+			continue
+		var btn: Button = _create_ability_button(ability_type as AbilityManager.AbilityType)
+		_ability_container.add_child(btn)
+		_ability_buttons[ability_type] = btn
+
+	# Add as CanvasLayer child so it stays on screen
+	var canvas: CanvasLayer = CanvasLayer.new()
+	canvas.layer = 10
+	add_child(canvas)
+	canvas.add_child(_ability_container)
+
+	_update_ability_buttons()
+
+
+func _create_ability_button(ability_type: AbilityManager.AbilityType) -> Button:
+	var btn: Button = Button.new()
+	btn.custom_minimum_size = Vector2(100, 70)
+	btn.add_theme_font_size_override("font_size", 18)
+
+	# Style
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.12, 0.2, 0.85)
+	sb.set_corner_radius_all(16)
+	sb.border_color = Color(0.3, 0.3, 0.5, 0.6)
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	btn.add_theme_stylebox_override("normal", sb)
+
+	var pressed_sb: StyleBoxFlat = sb.duplicate() as StyleBoxFlat
+	pressed_sb.bg_color = Color(0.2, 0.2, 0.35, 0.9)
+	btn.add_theme_stylebox_override("pressed", pressed_sb)
+
+	var disabled_sb: StyleBoxFlat = sb.duplicate() as StyleBoxFlat
+	disabled_sb.bg_color = Color(0.08, 0.08, 0.12, 0.6)
+	disabled_sb.border_color = Color(0.2, 0.2, 0.3, 0.3)
+	btn.add_theme_stylebox_override("disabled", disabled_sb)
+
+	btn.pressed.connect(_on_ability_pressed.bind(ability_type))
+	return btn
+
+
+func _update_ability_buttons() -> void:
+	for ability_type: int in _ability_buttons:
+		var btn: Button = _ability_buttons[ability_type] as Button
+		var ab_type: AbilityManager.AbilityType = ability_type as AbilityManager.AbilityType
+		var ab_charges: int = _ability_manager.get_charges(ab_type)
+		var ab_max: int = _ability_manager.get_max_charges(ab_type)
+		var ab_name: String = AbilityManager.get_ability_name(ab_type)
+		var ab_can_use: bool = _ability_manager.can_use(ab_type, _engine.phase)
+		var has_refill: bool = _ability_manager.has_ad_refill(ab_type)
+
+		# Update text
+		if has_refill:
+			btn.text = "%s\n%d/%d +" % [ab_name, ab_charges, ab_max]
+		else:
+			btn.text = "%s\n%d/%d" % [ab_name, ab_charges, ab_max]
+
+		# Update enabled state
+		btn.disabled = not ab_can_use and not has_refill
+
+		# Visual dimming
+		if ab_can_use:
+			btn.modulate.a = 1.0
+		elif has_refill:
+			btn.modulate.a = 0.85
+		else:
+			btn.modulate.a = 0.4
+
+
+func _on_ability_pressed(ability_type: AbilityManager.AbilityType) -> void:
+	# Check if this is an ad refill tap (charges depleted but refill available)
+	if _ability_manager.get_charges(ability_type) <= 0 and _ability_manager.has_ad_refill(ability_type):
+		_request_ad_refill(ability_type)
+		return
+
+	if not _ability_manager.can_use(ability_type, _engine.phase):
+		return
+
+	match ability_type:
+		AbilityManager.AbilityType.PEEK:
+			_use_peek()
+		AbilityManager.AbilityType.COOL_DOWN:
+			_use_cool_down()
+		AbilityManager.AbilityType.SWAP:
+			_use_swap()
+
+
+func _use_peek() -> void:
+	if not _ability_manager.use_ability(AbilityManager.AbilityType.PEEK):
+		return
+	_abilities_used_this_round += 1
+
+	var next: IngredientData = _engine.peek()
+	if next == null:
+		return
+
+	# Show peek overlay
+	_show_peek_overlay(next)
+	_update_ability_buttons()
+	AnalyticsManager.log_event("ability_used", {"ability": "peek"})
+
+
+func _use_cool_down() -> void:
+	if not _ability_manager.use_ability(AbilityManager.AbilityType.COOL_DOWN):
+		return
+	_abilities_used_this_round += 1
+
+	_engine.cool_down(GameManager.config.cool_down_amount)
+	_heat_ratio = clampf(_engine.heat / GameManager.config.boilover_threshold, 0.0, 1.0)
+	_pot_visual.set_heat(_heat_ratio)
+	_heat_draw.queue_redraw()
+
+	# Blue flash VFX
+	Juice.flash(_pot_visual, Color(0.3, 0.6, 1.0), 0.3)
+
+	# Ice particle burst
+	var ice_particles: CPUParticles2D = CPUParticles2D.new()
+	ice_particles.position = _pot_visual.position
+	ice_particles.emitting = true
+	ice_particles.one_shot = true
+	ice_particles.amount = 16
+	ice_particles.lifetime = 0.8
+	ice_particles.explosiveness = 1.0
+	ice_particles.direction = Vector2(0, -1)
+	ice_particles.spread = 60.0
+	ice_particles.initial_velocity_min = 100.0
+	ice_particles.initial_velocity_max = 250.0
+	ice_particles.gravity = Vector2(0, 300)
+	ice_particles.scale_amount_min = 4.0
+	ice_particles.scale_amount_max = 8.0
+	ice_particles.color = Color(0.5, 0.8, 1.0, 0.9)
+	add_child(ice_particles)
+	get_tree().create_timer(1.5).timeout.connect(func() -> void:
+		if is_instance_valid(ice_particles):
+			ice_particles.queue_free()
+	)
+
+	Utils.vibrate(20)
+	_update_ability_buttons()
+	AnalyticsManager.log_event("ability_used", {"ability": "cool_down"})
+
+
+func _use_swap() -> void:
+	if not _ability_manager.use_ability(AbilityManager.AbilityType.SWAP):
+		return
+	_abilities_used_this_round += 1
+
+	# Clean up current tile
+	if is_instance_valid(_current_tile):
+		# Spin-off animation
+		var old_tile: IngredientTile = _current_tile
+		var spin_tween: Tween = create_tween().set_parallel(true)
+		spin_tween.tween_property(old_tile, "rotation", TAU, 0.3)
+		spin_tween.tween_property(old_tile, "scale", Vector2.ZERO, 0.3)
+		spin_tween.tween_property(old_tile, "modulate:a", 0.0, 0.3)
+		spin_tween.chain().tween_callback(old_tile.queue_free)
+		_current_tile = null
+
+	# Draw replacement via engine
+	var replacement: IngredientData = _engine.swap_current()
+	if replacement == null:
+		_update_ability_buttons()
+		return
+
+	# Spawn new tile with pop-in
+	_update_hud()
+	_preview_label.text = "%s  (+%d pts)" % [replacement.display_name, replacement.points]
+
+	await get_tree().create_timer(0.35).timeout
+
+	_current_tile = _tile_scene.instantiate() as IngredientTile
+	_current_tile.setup(replacement)
+	add_child(_current_tile)
+	_current_tile.reveal(_tile_spawn.position)
+	_current_tile.missed.connect(_on_tile_missed)
+	_current_tile.flicked.connect(_on_tile_flicked)
+	_waiting_for_flick = true
+
+	Juice.pop_in(_current_tile, 0.25)
+	_update_ability_buttons()
+	AnalyticsManager.log_event("ability_used", {"ability": "swap"})
+
+
+func _show_peek_overlay(ingredient: IngredientData) -> void:
+	# Remove existing overlay and its canvas layer
+	if _peek_overlay != null and is_instance_valid(_peek_overlay):
+		var old_canvas: Node = _peek_overlay.get_parent()
+		if old_canvas != null and is_instance_valid(old_canvas):
+			old_canvas.queue_free()
+		else:
+			_peek_overlay.queue_free()
+		_peek_overlay = null
+
+	_peek_overlay = PanelContainer.new()
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.08, 0.14, 0.85)
+	sb.set_corner_radius_all(12)
+	sb.border_color = Color(0.4, 0.6, 1.0, 0.6)
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	_peek_overlay.add_theme_stylebox_override("panel", sb)
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_peek_overlay.add_child(vbox)
+
+	var title: Label = Label.new()
+	title.text = "NEXT UP"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(0.5, 0.7, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var name_label: Label = Label.new()
+	name_label.text = ingredient.display_name
+	name_label.add_theme_font_size_override("font_size", 28)
+	name_label.add_theme_color_override("font_color", ingredient.color.lightened(0.2))
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(name_label)
+
+	var info_label: Label = Label.new()
+	info_label.text = "+%d pts  |  %.2f heat" % [ingredient.points, ingredient.heat]
+	info_label.add_theme_font_size_override("font_size", 20)
+	info_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7))
+	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(info_label)
+
+	# Position above bag area
+	_peek_overlay.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_peek_overlay.offset_top = 180
+	_peek_overlay.offset_bottom = 300
+	_peek_overlay.offset_left = -140
+	_peek_overlay.offset_right = 140
+
+	# Add to canvas layer
+	var canvas: CanvasLayer = CanvasLayer.new()
+	canvas.layer = 11
+	add_child(canvas)
+	canvas.add_child(_peek_overlay)
+
+	Juice.pop_in(_peek_overlay, 0.25)
+
+	# Auto-dismiss after 3 seconds
+	get_tree().create_timer(3.0).timeout.connect(func() -> void:
+		if is_instance_valid(_peek_overlay):
+			var fade_tween: Tween = create_tween()
+			fade_tween.tween_property(_peek_overlay, "modulate:a", 0.0, 0.3)
+			fade_tween.tween_callback(func() -> void:
+				if is_instance_valid(_peek_overlay):
+					_peek_overlay.get_parent().queue_free()  # Remove canvas layer too
+					_peek_overlay = null
+			)
+	)
+
+
+func _request_ad_refill(ability_type: AbilityManager.AbilityType) -> void:
+	var ability_name: String = AbilityManager.get_ability_name(ability_type)
+	# Show rewarded ad
+	if not AdManager.show_rewarded():
+		return
+
+	# Connect to rewarded ad signal (one-shot)
+	# Signal signature: rewarded_ad_completed(reward_type: String, amount: int)
+	var callback: Callable = func(_reward_type: String, _amount: int) -> void:
+		_ability_manager.refill_ability(ability_type)
+		_update_ability_buttons()
+		AnalyticsManager.log_event("ad_refill_used", {"ability": ability_name})
+
+	if AdManager.has_signal("rewarded_ad_completed"):
+		if not AdManager.is_connected("rewarded_ad_completed", callback):
+			AdManager.rewarded_ad_completed.connect(callback, CONNECT_ONE_SHOT)

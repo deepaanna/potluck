@@ -63,6 +63,135 @@ func fill_bag() -> void:
 	bag.shuffle()
 
 
+## Heat-balanced bag generation. Ensures total heat slightly exceeds boilover
+## threshold so every round is tight but solvable.
+func fill_bag_balanced(chef_level: int, unlocked_cuisines: Array) -> void:
+	bag.clear()
+	var eligible: Array[IngredientData] = IngredientDatabase.get_eligible_ingredients(unlocked_cuisines)
+	if eligible.is_empty():
+		fill_bag()
+		return
+
+	var bag_size: int = ProgressionManager.get_effective_bag_size(chef_level, _config.bag_size)
+	var heat_ratio: float = ProgressionManager.get_heat_budget_ratio(
+		chef_level, _config.heat_budget_ratio_min, _config.heat_budget_ratio_max, _config.heat_budget_level_cap)
+	var target_budget: float = _config.boilover_threshold * heat_ratio
+
+	# Build rarity-weighted pool
+	var pool: Array[IngredientData] = []
+	for ingredient: IngredientData in eligible:
+		var copies: int = _rarity_copies(ingredient.rarity)
+		for i: int in range(copies):
+			pool.append(ingredient)
+	pool.shuffle()
+
+	# Greedy fill: track remaining budget
+	var remaining_budget: float = target_budget
+	var selected: Array[IngredientData] = []
+
+	for candidate: IngredientData in pool:
+		if selected.size() >= bag_size:
+			break
+		if candidate.heat <= remaining_budget:
+			selected.append(candidate)
+			remaining_budget -= candidate.heat
+
+	# If we didn't fill the bag, add lowest-heat ingredients to fill
+	if selected.size() < bag_size:
+		var sorted_pool: Array[IngredientData] = eligible.duplicate()
+		sorted_pool.sort_custom(func(a: IngredientData, b: IngredientData) -> bool:
+			return a.heat < b.heat)
+		for filler: IngredientData in sorted_pool:
+			if selected.size() >= bag_size:
+				break
+			selected.append(filler)
+
+	# Tension shaping: ensure at least 1 spicy (heat >= 0.10) and 2 safe (heat <= 0.05)
+	var spicy_count: int = 0
+	var safe_count: int = 0
+	for ing: IngredientData in selected:
+		if ing.heat >= 0.10:
+			spicy_count += 1
+		if ing.heat <= 0.05:
+			safe_count += 1
+
+	# Find candidates from eligible pool for swaps
+	var spicy_candidates: Array[IngredientData] = []
+	var safe_candidates: Array[IngredientData] = []
+	for ing: IngredientData in eligible:
+		if ing.heat >= 0.10:
+			spicy_candidates.append(ing)
+		if ing.heat <= 0.05:
+			safe_candidates.append(ing)
+
+	# Swap in spicy if needed
+	if spicy_count == 0 and not spicy_candidates.is_empty():
+		spicy_candidates.shuffle()
+		# Replace a mid-heat ingredient with spicy
+		for i: int in range(selected.size()):
+			if selected[i].heat >= 0.05 and selected[i].heat < 0.10:
+				selected[i] = spicy_candidates[0]
+				break
+
+	# Swap in safe if needed
+	if safe_count < 2 and not safe_candidates.is_empty():
+		safe_candidates.shuffle()
+		var swaps_needed: int = 2 - safe_count
+		var swap_idx: int = 0
+		for i: int in range(selected.size()):
+			if swaps_needed <= 0:
+				break
+			if selected[i].heat > 0.05 and selected[i].heat < 0.10:
+				selected[i] = safe_candidates[swap_idx % safe_candidates.size()]
+				swap_idx += 1
+				swaps_needed -= 1
+
+	# Validate total heat is in acceptable range
+	var total_heat: float = 0.0
+	for ing: IngredientData in selected:
+		total_heat += ing.heat
+	var min_heat: float = _config.boilover_threshold * 0.95
+	var max_heat: float = _config.boilover_threshold * 1.40
+	if total_heat < min_heat or total_heat > max_heat:
+		# Fallback: use standard bag generation
+		push_warning("PotLuckEngine: Balanced bag heat %.3f outside range [%.3f, %.3f], falling back to random bag" % [total_heat, min_heat, max_heat])
+		fill_bag()
+		return
+
+	# Final shuffle for unpredictable draw order
+	selected.shuffle()
+	bag = selected
+
+
+## Peek at the next ingredient without popping it from the bag.
+func peek() -> IngredientData:
+	if bag.is_empty():
+		return null
+	return bag.back()
+
+
+## Discard the current drawn ingredient and draw a replacement from the bag.
+func swap_current() -> IngredientData:
+	if current_ingredient == null:
+		return null
+	if phase != Phase.DRAW:
+		return null
+	# Discard current ingredient entirely (not returned to bag)
+	current_ingredient = null
+	# Draw replacement
+	if bag.is_empty():
+		return null
+	current_ingredient = bag.pop_back()
+	ingredient_drawn.emit(current_ingredient)
+	return current_ingredient
+
+
+## Reduce heat by the configured cool down amount.
+func cool_down(amount: float) -> void:
+	heat = maxf(0.0, heat - amount)
+	heat_changed.emit(heat, get_heat_stage())
+
+
 func draw() -> IngredientData:
 	if bag.is_empty():
 		return null

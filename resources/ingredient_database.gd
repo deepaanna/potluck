@@ -43,6 +43,44 @@ static func get_all_combos() -> Array[ComboData]:
 	return _combos
 
 
+## Get all ingredients filtered by unlocked cuisine keys (e.g. ["basic", "italian"]).
+static func get_eligible_ingredients(unlocked_cuisines: Array) -> Array[IngredientData]:
+	_ensure_init()
+	var result: Array[IngredientData] = []
+	for ingredient: IngredientData in _ingredients.values():
+		var cuisine_key: String = _cuisine_to_key(ingredient.cuisine)
+		if cuisine_key in unlocked_cuisines:
+			result.append(ingredient)
+	return result
+
+
+## Get all combos where BOTH ingredients belong to unlocked cuisines.
+static func get_eligible_combos(unlocked_cuisines: Array) -> Array[ComboData]:
+	_ensure_init()
+	var result: Array[ComboData] = []
+	for combo: ComboData in _combos:
+		var a: IngredientData = _ingredients.get(combo.ingredient_a) as IngredientData
+		var b: IngredientData = _ingredients.get(combo.ingredient_b) as IngredientData
+		if a == null or b == null:
+			continue
+		var a_key: String = _cuisine_to_key(a.cuisine)
+		var b_key: String = _cuisine_to_key(b.cuisine)
+		if a_key in unlocked_cuisines and b_key in unlocked_cuisines:
+			result.append(combo)
+	return result
+
+
+static func _cuisine_to_key(cuisine: IngredientData.Cuisine) -> String:
+	match cuisine:
+		IngredientData.Cuisine.BASIC:
+			return "basic"
+		IngredientData.Cuisine.ITALIAN:
+			return "italian"
+		IngredientData.Cuisine.JAPANESE:
+			return "japanese"
+	return "basic"
+
+
 static func find_new_combos(pot_ids: Array[String], new_id: String) -> Array[ComboData]:
 	_ensure_init()
 	var found: Array[ComboData] = []

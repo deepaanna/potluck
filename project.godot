@@ -24,6 +24,11 @@ AnalyticsManager="*res://autoloads/analytics_manager.gd"
 AdManager="*res://autoloads/ad_manager.gd"
 IAPManager="*res://autoloads/iap_manager.gd"
 ABTestManager="*res://autoloads/ab_test_manager.gd"
+TutorialManager="*res://autoloads/tutorial_manager.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/godot-firebase/plugin.cfg")
 
 [debug]
 

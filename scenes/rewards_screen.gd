@@ -36,8 +36,8 @@ func _ready() -> void:
 	_was_boilover = _pot_luck_data.get("was_boilover", false) as bool
 	_was_daily = _pot_luck_data.get("mode", "endless") == "daily"
 	_score = GameManager.score
-	var high_score: int = SaveManager.get_value("high_score", 0) as int
-	_is_new_high_score = _score >= high_score and _score > 0
+	var previous_high: int = _pot_luck_data.get("previous_high_score", 0) as int
+	_is_new_high_score = _score > 0 and _score > previous_high
 
 	# Header
 	if _was_boilover:
@@ -100,7 +100,24 @@ func _build_cards() -> void:
 		if ingredients_count > 0:
 			cards.append(_build_ingredients_card())
 
-	# 6. Milestones Card (always check)
+	# 6. XP Card (always — shows XP breakdown)
+	cards.append(_build_xp_card())
+
+	# 7. Level Up Card (if leveled up)
+	var leveled_up: bool = _pot_luck_data.get("leveled_up", false) as bool
+	if leveled_up:
+		cards.append(_build_level_up_card())
+
+	# 8. Unlock Cards (cuisine, ability)
+	var unlocks: Array = _pot_luck_data.get("unlocks", []) as Array
+	for unlock: Dictionary in unlocks:
+		var unlock_type: String = unlock.get("type", "") as String
+		if unlock_type == "cuisine":
+			cards.append(_build_cuisine_unlock_card(unlock))
+		elif unlock_type == "ability":
+			cards.append(_build_ability_unlock_card(unlock))
+
+	# 9. Milestones Card (always check)
 	var milestones: Array[Dictionary] = _check_milestones()
 	if milestones.size() > 0:
 		cards.append(_build_milestones_card(milestones))
@@ -362,6 +379,194 @@ func _build_milestones_card(milestones: Array[Dictionary]) -> PanelContainer:
 	if _was_boilover:
 		_set_card_accent(card, ACCENT_RED)
 
+	return card
+
+
+func _build_xp_card() -> PanelContainer:
+	var card: PanelContainer = _create_card_container()
+	var vbox: VBoxContainer = _get_card_content(card)
+
+	var xp_earned: int = _pot_luck_data.get("xp_earned", 0) as int
+	var current_xp: int = _pot_luck_data.get("current_xp", 0) as int
+	var xp_for_next: int = _pot_luck_data.get("xp_for_next", 25) as int
+	var new_level: int = _pot_luck_data.get("new_level", 1) as int
+
+	var header_hbox: HBoxContainer = _create_header_row("XP Earned", "+%d" % xp_earned)
+	var value_label: Label = header_hbox.get_child(1) as Label
+	value_label.add_theme_color_override("font_color", Color(0.9, 0.75, 0.3))
+	vbox.add_child(header_hbox)
+
+	# XP breakdown
+	if not _was_boilover:
+		var breakdown: Array[String] = []
+		breakdown.append("Base: +10")
+		var final_score: int = _pot_luck_data.get("final_score", 0) as int
+		if final_score > 0:
+			breakdown.append("Score: +%d" % (final_score / 10))
+		var combos: int = _pot_luck_data.get("combos", 0) as int
+		if combos > 0:
+			breakdown.append("Combos: +%d" % (combos * 5))
+		var bag_emptied: bool = _pot_luck_data.get("bag_emptied", false) as bool
+		if bag_emptied:
+			breakdown.append("Clean Pot: +15")
+		var new_recipes: Array = _pot_luck_data.get("new_recipes", []) as Array
+		if new_recipes.size() > 0:
+			breakdown.append("New Recipes: +%d" % (new_recipes.size() * 25))
+
+		var details_label: Label = Label.new()
+		details_label.text = "  ".join(breakdown)
+		details_label.add_theme_font_size_override("font_size", 18)
+		details_label.add_theme_color_override("font_color", MUTED_COLOR)
+		details_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(details_label)
+	else:
+		var consolation: Label = Label.new()
+		consolation.text = "Consolation XP"
+		consolation.add_theme_font_size_override("font_size", 20)
+		consolation.add_theme_color_override("font_color", MUTED_COLOR)
+		vbox.add_child(consolation)
+
+	# Progress bar
+	var bar_bg: ColorRect = ColorRect.new()
+	bar_bg.custom_minimum_size = Vector2(0, 14)
+	bar_bg.color = Color(0.12, 0.12, 0.18)
+	vbox.add_child(bar_bg)
+
+	var bar_fill: ColorRect = ColorRect.new()
+	bar_fill.custom_minimum_size = Vector2(0, 14)
+	bar_fill.color = Color(0.9, 0.75, 0.2, 0.9)
+	var fill_ratio: float = float(current_xp) / float(xp_for_next) if xp_for_next > 0 else 0.0
+	bar_fill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	bar_fill.set_meta("_xp_fill_ratio", fill_ratio)
+	bar_bg.add_child(bar_fill)
+
+	var progress_text: Label = Label.new()
+	progress_text.text = "Level %d — %d / %d XP" % [new_level, current_xp, xp_for_next]
+	progress_text.add_theme_font_size_override("font_size", 20)
+	progress_text.add_theme_color_override("font_color", MUTED_COLOR)
+	progress_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(progress_text)
+
+	_set_card_accent(card, Color(0.9, 0.75, 0.3))
+	return card
+
+
+func _build_level_up_card() -> PanelContainer:
+	var card: PanelContainer = _create_card_container()
+	var vbox: VBoxContainer = _get_card_content(card)
+
+	var new_level: int = _pot_luck_data.get("new_level", 1) as int
+
+	var title: Label = Label.new()
+	title.text = "LEVEL UP!"
+	title.add_theme_font_size_override("font_size", 42)
+	title.add_theme_color_override("font_color", ACCENT_GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var level_text: Label = Label.new()
+	level_text.text = "Chef Level %d" % new_level
+	level_text.add_theme_font_size_override("font_size", 30)
+	level_text.add_theme_color_override("font_color", Color(0.9, 0.8, 0.4))
+	level_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(level_text)
+
+	# List any unlocks
+	var unlocks: Array = _pot_luck_data.get("unlocks", []) as Array
+	if unlocks.size() > 0:
+		var unlock_header: Label = Label.new()
+		unlock_header.text = "New Unlocks:"
+		unlock_header.add_theme_font_size_override("font_size", 22)
+		unlock_header.add_theme_color_override("font_color", MUTED_COLOR)
+		vbox.add_child(unlock_header)
+		for unlock: Dictionary in unlocks:
+			var desc: Label = Label.new()
+			desc.text = "* %s" % (unlock.get("description", "") as String)
+			desc.add_theme_font_size_override("font_size", 22)
+			desc.add_theme_color_override("font_color", ACCENT_GOLD)
+			desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+			vbox.add_child(desc)
+
+	_set_card_accent(card, ACCENT_GOLD)
+	card.set_meta("_recipe_card", true)  # Extra pop animation
+	return card
+
+
+func _build_cuisine_unlock_card(unlock: Dictionary) -> PanelContainer:
+	var card: PanelContainer = _create_card_container()
+	var vbox: VBoxContainer = _get_card_content(card)
+
+	var cuisine_key: String = unlock.get("key", "") as String
+	var cuisine_name: String = cuisine_key.capitalize()
+
+	var title: Label = Label.new()
+	title.text = "CUISINE UNLOCKED!"
+	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_color_override("font_color", ACCENT_GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var name_label: Label = Label.new()
+	name_label.text = "%s Cuisine" % cuisine_name
+	name_label.add_theme_font_size_override("font_size", 28)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(name_label)
+
+	# Show new ingredients
+	var cuisine_enum: IngredientData.Cuisine = IngredientData.Cuisine.BASIC
+	if cuisine_key == "italian":
+		cuisine_enum = IngredientData.Cuisine.ITALIAN
+	elif cuisine_key == "japanese":
+		cuisine_enum = IngredientData.Cuisine.JAPANESE
+
+	var new_ingredients: Array[IngredientData] = IngredientDatabase.get_ingredients_by_cuisine(cuisine_enum)
+	if new_ingredients.size() > 0:
+		var ing_names: PackedStringArray = PackedStringArray()
+		for ing: IngredientData in new_ingredients:
+			ing_names.append(ing.display_name)
+		var ingredients_text: Label = Label.new()
+		ingredients_text.text = ", ".join(ing_names)
+		ingredients_text.add_theme_font_size_override("font_size", 20)
+		ingredients_text.add_theme_color_override("font_color", MUTED_COLOR)
+		ingredients_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ingredients_text.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(ingredients_text)
+
+	# Combo count hint
+	var unlocked: Array = SaveManager.get_value("pot_luck.unlocked_cuisines", ["basic"]) as Array
+	var eligible_combos: Array[ComboData] = IngredientDatabase.get_eligible_combos(unlocked)
+	var combos_label: Label = Label.new()
+	combos_label.text = "New combos to discover!"
+	combos_label.add_theme_font_size_override("font_size", 22)
+	combos_label.add_theme_color_override("font_color", ACCENT_GREEN)
+	combos_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(combos_label)
+
+	_set_card_accent(card, ACCENT_GOLD)
+	card.set_meta("_recipe_card", true)
+	return card
+
+
+func _build_ability_unlock_card(unlock: Dictionary) -> PanelContainer:
+	var card: PanelContainer = _create_card_container()
+	var vbox: VBoxContainer = _get_card_content(card)
+
+	var title: Label = Label.new()
+	title.text = "NEW ABILITY!"
+	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var desc: Label = Label.new()
+	desc.text = unlock.get("description", "") as String
+	desc.add_theme_font_size_override("font_size", 24)
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	vbox.add_child(desc)
+
+	_set_card_accent(card, Color(0.4, 0.7, 1.0))
+	card.set_meta("_recipe_card", true)
 	return card
 
 

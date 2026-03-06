@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CuisineTheme" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cuisine_theme.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+theme_name = "basic"
+accent_color = Color(0.3, 0.5, 1.0, 1)
+accent_hover = Color(0.4, 0.6, 1.0, 1)
+accent_pressed = Color(0.2, 0.35, 0.8, 1)
+panel_bg = Color(0.15, 0.15, 0.2, 1)
+panel_border = Color(0.25, 0.25, 0.35, 1)
+pot_tint = Color(1, 1, 1, 1)
+label_shadow_color = Color(0, 0, 0, 0.5)
+label_outline_color = Color(0, 0, 0, 0.6)
+button_glow_color = Color(1, 1, 1, 0.3)
+glossy = false

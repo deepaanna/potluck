@@ -1,5 +1,5 @@
-## A/B test configuration manager with key-value defaults.
-## Stub implementation — replace with Firebase Remote Config for production.
+## A/B test configuration manager backed by Firebase Remote Config.
+## Falls back to local defaults when Firebase is unavailable.
 extends Node
 
 signal config_fetched
@@ -9,19 +9,31 @@ var _config: Dictionary = {}
 var _defaults: Dictionary = {}
 var _fetched_config: Dictionary = {}
 var _is_fetched: bool = false
+var _firebase_available: bool = false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_firebase_available = _detect_firebase()
 	_load_cached_config()
+
+	set_defaults({
+		"boil_threshold": 1.0,
+	})
+
+	config_activated.connect(_apply_remote_values)
+	fetch_and_activate()
 
 
 ## Set default values for A/B test parameters
 func set_defaults(defaults: Dictionary) -> void:
-	_defaults = defaults.duplicate(true)
-	for key: String in _defaults:
+	_defaults.merge(defaults, true)
+	for key: String in defaults:
 		if not _config.has(key):
-			_config[key] = _defaults[key]
+			_config[key] = defaults[key]
+
+	if _firebase_available:
+		Firebase.RemoteConfig.set_defaults(defaults)
 
 
 ## Get a string config value
@@ -49,13 +61,17 @@ func get_bool(key: String, default: bool = false) -> bool:
 
 ## Fetch remote config from server
 func fetch() -> void:
-	## INTEGRATION POINT: Fetch from Firebase Remote Config here
-	## Firebase.RemoteConfig.fetch()
-	if OS.is_debug_build():
-		print("[ABTestManager] Config fetched (stub)")
+	if _firebase_available:
+		Firebase.RemoteConfig.fetch()
+		await Firebase.RemoteConfig.fetch_completed
+		_fetched_config = {}
+		for key: String in _defaults:
+			_fetched_config[key] = Firebase.RemoteConfig.get_value(key)
+	else:
+		if OS.is_debug_build():
+			print("[ABTestManager] Config fetched (stub — Firebase not available)")
+		_fetched_config = _defaults.duplicate(true)
 
-	# Simulate fetch completion
-	_fetched_config = _defaults.duplicate(true)
 	_is_fetched = true
 	config_fetched.emit()
 
@@ -69,21 +85,40 @@ func activate() -> void:
 	_config.merge(_fetched_config, true)
 	_cache_config()
 
-	## INTEGRATION POINT: Activate Firebase Remote Config here
-	## Firebase.RemoteConfig.activate()
-	if OS.is_debug_build():
-		print("[ABTestManager] Config activated (stub): %s" % str(_config))
+	if _firebase_available:
+		Firebase.RemoteConfig.activate()
+	elif OS.is_debug_build():
+		print("[ABTestManager] Config activated: %s" % str(_config))
 
 	config_activated.emit()
 
 
 ## Fetch and activate in one call
 func fetch_and_activate() -> void:
-	## INTEGRATION POINT: Use Firebase fetch_and_activate here
 	fetch()
-	# Wait a frame to simulate async
-	await get_tree().process_frame
+	if not _firebase_available:
+		await get_tree().process_frame
 	activate()
+
+
+## Apply remote config values to game systems
+func _apply_remote_values() -> void:
+	var boil: float = get_float("boil_threshold", 1.0)
+	GameManager.config.boilover_threshold = boil
+	if OS.is_debug_build():
+		print("[ABTestManager] boilover_threshold = %s" % boil)
+
+
+func _detect_firebase() -> bool:
+	# GodotFirebase addon exposes a global Firebase singleton
+	if ClassDB.class_exists(&"Firebase"):
+		return true
+	if Engine.has_singleton("Firebase"):
+		return true
+	# Check if the global script autoload exists
+	if get_node_or_null("/root/Firebase") != null:
+		return true
+	return false
 
 
 func _load_cached_config() -> void:

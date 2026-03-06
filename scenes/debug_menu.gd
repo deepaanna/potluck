@@ -11,6 +11,14 @@ extends BasePopup
 
 var _confirm_reset: bool = false
 
+# Progression debug buttons (created in code)
+var _set_level_5_button: Button
+var _set_level_15_button: Button
+var _set_level_25_button: Button
+var _add_xp_button: Button
+var _unlock_cuisines_button: Button
+var _reset_progression_button: Button
+
 
 func _ready() -> void:
 	_reset_progress_button.pressed.connect(_on_reset_progress)
@@ -19,6 +27,7 @@ func _ready() -> void:
 	_set_score_button.pressed.connect(_on_set_score)
 	_close_button.pressed.connect(dismiss)
 
+	_create_progression_buttons()
 	_refresh_status()
 
 
@@ -30,11 +39,17 @@ func _refresh_status() -> void:
 	var perfect_pots: int = SaveManager.get_value("pot_luck.stats.perfect_pots", 0) as int
 	var recipes: int = RecipeBook.get_discovery_count()
 	var total_recipes: int = RecipeBook.get_total_count()
+	var chef_level: int = SaveManager.get_value("pot_luck.chef_level", 1) as int
+	var chef_xp: int = SaveManager.get_value("pot_luck.chef_xp", 0) as int
+	var xp_needed: int = ProgressionManager.xp_for_level(chef_level)
+	var cuisines: Array = SaveManager.get_value("pot_luck.unlocked_cuisines", ["basic"]) as Array
 
-	_status_label.text = "High Score: %s | Games: %d\nServed: %d | Boilovers: %d | Perfect: %d\nRecipes: %d/%d" % [
+	_status_label.text = "High Score: %s | Games: %d\nServed: %d | Boilovers: %d | Perfect: %d\nRecipes: %d/%d\nChef Level: %d | XP: %d/%d\nCuisines: %s" % [
 		Utils.format_number(high_score), total_games,
 		total_served, total_boilovers, perfect_pots,
 		recipes, total_recipes,
+		chef_level, chef_xp, xp_needed,
+		", ".join(cuisines),
 	]
 
 
@@ -78,6 +93,103 @@ func _on_unlock_recipes() -> void:
 func _on_set_score() -> void:
 	SaveManager.set_value("high_score", 999)
 	_show_feedback("High score set to 999")
+	_refresh_status()
+
+
+func _create_progression_buttons() -> void:
+	# Find the VBox containing existing buttons
+	var button_parent: Control = _reset_progress_button.get_parent()
+
+	_set_level_5_button = _make_debug_button("Set Level 5")
+	_set_level_5_button.pressed.connect(func() -> void: _set_chef_level(5))
+	button_parent.add_child(_set_level_5_button)
+
+	_set_level_15_button = _make_debug_button("Set Level 15")
+	_set_level_15_button.pressed.connect(func() -> void: _set_chef_level(15))
+	button_parent.add_child(_set_level_15_button)
+
+	_set_level_25_button = _make_debug_button("Set Level 25")
+	_set_level_25_button.pressed.connect(func() -> void: _set_chef_level(25))
+	button_parent.add_child(_set_level_25_button)
+
+	_add_xp_button = _make_debug_button("Add 1000 XP")
+	_add_xp_button.pressed.connect(_on_add_xp)
+	button_parent.add_child(_add_xp_button)
+
+	_unlock_cuisines_button = _make_debug_button("Unlock All Cuisines")
+	_unlock_cuisines_button.pressed.connect(_on_unlock_cuisines)
+	button_parent.add_child(_unlock_cuisines_button)
+
+	_reset_progression_button = _make_debug_button("Reset Progression")
+	_reset_progression_button.pressed.connect(_on_reset_progression)
+	button_parent.add_child(_reset_progression_button)
+
+
+func _make_debug_button(text: String) -> Button:
+	var btn: Button = Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(0, 60)
+	btn.add_theme_font_size_override("font_size", 24)
+	return btn
+
+
+func _set_chef_level(target_level: int) -> void:
+	SaveManager.set_value("pot_luck.chef_level", target_level)
+	SaveManager.set_value("pot_luck.chef_xp", 0)
+	GameManager.chef_level = target_level
+	GameManager.chef_xp = 0
+
+	# Sync cuisine unlocks
+	var cuisines: Array[String] = ProgressionManager.get_unlocked_cuisines(target_level)
+	SaveManager.set_value("pot_luck.unlocked_cuisines", cuisines)
+
+	# Sync abilities
+	var abilities: Array[String] = ProgressionManager.get_unlocked_abilities(target_level)
+	SaveManager.set_value("pot_luck.abilities_unlocked", abilities)
+
+	_show_feedback("Set to Chef Level %d" % target_level)
+	_refresh_status()
+
+
+func _on_add_xp() -> void:
+	var chef_level: int = SaveManager.get_value("pot_luck.chef_level", 1) as int
+	var chef_xp: int = SaveManager.get_value("pot_luck.chef_xp", 0) as int
+	chef_xp += 1000
+
+	# Process level-ups
+	while chef_xp >= ProgressionManager.xp_for_level(chef_level):
+		chef_xp -= ProgressionManager.xp_for_level(chef_level)
+		chef_level += 1
+
+	SaveManager.set_value("pot_luck.chef_level", chef_level)
+	SaveManager.set_value("pot_luck.chef_xp", chef_xp)
+	GameManager.chef_level = chef_level
+	GameManager.chef_xp = chef_xp
+
+	# Sync unlocks
+	var cuisines: Array[String] = ProgressionManager.get_unlocked_cuisines(chef_level)
+	SaveManager.set_value("pot_luck.unlocked_cuisines", cuisines)
+	var abilities: Array[String] = ProgressionManager.get_unlocked_abilities(chef_level)
+	SaveManager.set_value("pot_luck.abilities_unlocked", abilities)
+
+	_show_feedback("+1000 XP → Level %d" % chef_level)
+	_refresh_status()
+
+
+func _on_unlock_cuisines() -> void:
+	SaveManager.set_value("pot_luck.unlocked_cuisines", ["basic", "italian", "japanese"])
+	_show_feedback("All cuisines unlocked!")
+	_refresh_status()
+
+
+func _on_reset_progression() -> void:
+	SaveManager.set_value("pot_luck.chef_level", 1)
+	SaveManager.set_value("pot_luck.chef_xp", 0)
+	SaveManager.set_value("pot_luck.abilities_unlocked", [])
+	SaveManager.set_value("pot_luck.unlocked_cuisines", ["basic"])
+	GameManager.chef_level = 1
+	GameManager.chef_xp = 0
+	_show_feedback("Progression reset to Level 1")
 	_refresh_status()
 
 

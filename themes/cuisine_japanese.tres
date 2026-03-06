@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CuisineTheme" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://resources/cuisine_theme.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+theme_name = "japanese"
+accent_color = Color(0.85, 0.15, 0.1, 1)
+accent_hover = Color(0.95, 0.25, 0.15, 1)
+accent_pressed = Color(0.6, 0.1, 0.05, 1)
+panel_bg = Color(0.12, 0.08, 0.1, 1)
+panel_border = Color(0.45, 0.15, 0.1, 1)
+pot_tint = Color(1.0, 0.92, 0.88, 1)
+label_shadow_color = Color(0.3, 0.0, 0.0, 0.6)
+label_outline_color = Color(0.15, 0.0, 0.0, 0.7)
+button_glow_color = Color(1.0, 0.3, 0.15, 0.4)
+glossy = true

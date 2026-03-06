@@ -120,6 +120,31 @@ static func slam_in(node: CanvasItem, duration: float = 0.3, delay: float = 0.0)
 	return tween
 
 
+## Button press glow — scale bump + color flash for tactile feedback
+static func button_press_glow(button: Button, glow_color: Color = Color(1, 1, 1, 0.3)) -> Tween:
+	if not is_instance_valid(button):
+		return null
+
+	_kill_tweens(button, "scale")
+	_kill_tweens(button, "modulate")
+	var original_scale: Vector2 = button.scale
+	var original_modulate: Color = button.modulate
+
+	# Scale tween: bump up then back
+	var scale_tween: Tween = button.create_tween()
+	scale_tween.tween_property(button, "scale", original_scale * 1.08, 0.08).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	scale_tween.tween_property(button, "scale", original_scale, 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	_track_tween(button, "scale", scale_tween)
+
+	# Color tween: flash then restore
+	var color_tween: Tween = button.create_tween()
+	color_tween.tween_property(button, "modulate", glow_color.lightened(0.3), 0.06).set_ease(Tween.EASE_OUT)
+	color_tween.tween_property(button, "modulate", original_modulate, 0.15).set_ease(Tween.EASE_OUT)
+	_track_tween(button, "modulate", color_tween)
+
+	return scale_tween
+
+
 ## Kill any previous juice tween on this node+property via metadata tracking
 static func _kill_tweens(node: CanvasItem, property: String) -> void:
 	var meta_key: String = "_juice_tween_%s" % property

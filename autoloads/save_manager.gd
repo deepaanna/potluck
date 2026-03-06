@@ -8,7 +8,7 @@ signal data_changed(key: String, value: Variant)
 
 const SAVE_PATH: String = "user://save.json"
 const AUTO_SAVE_INTERVAL: float = 30.0
-const SAVE_VERSION: int = 2
+const SAVE_VERSION: int = 3
 
 var _data: Dictionary = {}
 var _dirty: bool = false
@@ -42,12 +42,26 @@ var _default_data: Dictionary = {
 		"unlocked_cuisines": ["basic"],
 		"recipes_discovered": [],
 		"daily_challenge": {"last_date": "", "best_score": 0},
+		"tutorial_completed": false,
+		"onboarding_step": 0,
+		"onboarding_completed": false,
+		"chef_level": 1,
+		"chef_xp": 0,
+		"abilities_unlocked": [],
+		"spice_coins": 0,
+		"chefs_pass_active": false,
+		"chefs_pass_expiry": 0,
+		"equipped_pot_skin": "default",
+		"owned_pot_skins": ["default"],
 		"stats": {
 			"total_dishes_served": 0,
 			"total_boilovers": 0,
 			"total_ingredients_used": 0,
 			"best_combo_multiplier": 1.0,
 			"perfect_pots": 0,
+			"total_xp_earned": 0,
+			"total_abilities_used": 0,
+			"highest_level_reached": 1,
 		},
 	},
 }
@@ -166,6 +180,18 @@ func _migrate_data() -> void:
 	var version: int = _data.get("save_version", 0) as int
 	if version < 2:
 		_data["pot_luck"] = _default_data["pot_luck"].duplicate(true)
+	if version < 3:
+		# Ensure pot_luck top-level keys exist for v3 additions
+		if _data.has("pot_luck") and _data["pot_luck"] is Dictionary:
+			var pl: Dictionary = _data["pot_luck"] as Dictionary
+			if not pl.has("chef_level"):
+				pl["chef_level"] = 1
+			if not pl.has("chef_xp"):
+				pl["chef_xp"] = 0
+			if not pl.has("abilities_unlocked"):
+				pl["abilities_unlocked"] = []
+			if not pl.has("tutorial_completed"):
+				pl["tutorial_completed"] = false
 	if version < SAVE_VERSION:
 		_data["save_version"] = SAVE_VERSION
 		_dirty = true

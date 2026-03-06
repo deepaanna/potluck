@@ -14,12 +14,16 @@ extends Control
 const SETTINGS_SCENE: PackedScene = preload("res://scenes/settings.tscn")
 const GDPR_SCENE: PackedScene = preload("res://scenes/gdpr_consent.tscn")
 const DEBUG_MENU_SCENE: PackedScene = preload("res://scenes/debug_menu.tscn")
+const BGM_MENU: String = "res://assets/audio/music/menu_bgm.wav"
 
 
 func _ready() -> void:
 	if GameManager.current_state != GameManager.GameState.MENU:
 		GameManager.change_state(GameManager.GameState.MENU)
 	AnalyticsManager.log_screen("main_menu")
+
+	# Apply cuisine theme
+	UIManager.swap_cuisine_theme(UIManager.get_active_cuisine_name())
 
 	title_label.text = GameManager.config.game_name
 
@@ -36,6 +40,7 @@ func _ready() -> void:
 
 	_update_daily_button()
 	_update_recipe_button()
+	_create_level_display()
 
 	# If TitleArt has a texture, show it instead of text
 	if title_art.texture:
@@ -48,6 +53,9 @@ func _ready() -> void:
 	AdManager.show_banner()
 	_check_gdpr()
 	_play_entrance_animations()
+
+	# Start menu BGM with crossfade (if coming from game)
+	AudioManager.play_music_path(BGM_MENU, -8.0, true)
 
 
 func _update_daily_button() -> void:
@@ -130,6 +138,62 @@ func _add_debug_button() -> void:
 	debug_button.pressed.connect(func() -> void:
 		UIManager.show_popup(DEBUG_MENU_SCENE)
 	)
+
+
+func _create_level_display() -> void:
+	var chef_level: int = SaveManager.get_value("pot_luck.chef_level", 1) as int
+	var chef_xp: int = SaveManager.get_value("pot_luck.chef_xp", 0) as int
+	var xp_needed: int = ProgressionManager.xp_for_level(chef_level)
+
+	# Container below high score label
+	var level_container: VBoxContainer = VBoxContainer.new()
+	level_container.add_theme_constant_override("separation", 4)
+
+	# Level label
+	var level_label: Label = Label.new()
+	level_label.text = "Chef Level %d" % chef_level
+	level_label.add_theme_font_size_override("font_size", 26)
+	level_label.add_theme_color_override("font_color", Color(0.9, 0.75, 0.3))
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_container.add_child(level_label)
+
+	# XP progress bar (custom drawn)
+	var bar_container: Control = Control.new()
+	bar_container.custom_minimum_size = Vector2(300, 16)
+	bar_container.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	level_container.add_child(bar_container)
+
+	var bar_bg: ColorRect = ColorRect.new()
+	bar_bg.color = Color(0.12, 0.12, 0.18, 0.8)
+	bar_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bar_container.add_child(bar_bg)
+
+	var bar_fill: ColorRect = ColorRect.new()
+	bar_fill.color = Color(0.9, 0.75, 0.2, 0.9)
+	bar_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	var fill_ratio: float = float(chef_xp) / float(xp_needed) if xp_needed > 0 else 0.0
+	bar_fill.anchor_right = fill_ratio
+	bar_container.add_child(bar_fill)
+
+	# XP text
+	var xp_label: Label = Label.new()
+	xp_label.text = "%d / %d XP" % [chef_xp, xp_needed]
+	xp_label.add_theme_font_size_override("font_size", 18)
+	xp_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
+	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_container.add_child(xp_label)
+
+	# Insert after high score label
+	var parent: Control = high_score_label.get_parent()
+	var idx: int = high_score_label.get_index() + 1
+	parent.add_child(level_container)
+	parent.move_child(level_container, idx)
+
+	# Entrance animation
+	level_container.modulate.a = 0.0
+	var tween: Tween = create_tween()
+	tween.tween_interval(0.25)
+	tween.tween_property(level_container, "modulate:a", 1.0, 0.25)
 
 
 func _check_gdpr() -> void:

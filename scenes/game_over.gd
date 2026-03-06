@@ -3,6 +3,8 @@
 extends Control
 
 @onready var _background: ColorRect = %Background
+@onready var _background_art: TextureRect = %BackgroundArt
+@onready var _score_banner: TextureRect = %ScoreBanner
 @onready var _screen_flash: ColorRect = %ScreenFlash
 @onready var _vfx_layer: Control = $VFXLayer
 @onready var _score_label: Label = %ScoreLabel
@@ -18,8 +20,13 @@ var _was_boilover: bool = false
 var _bag_emptied: bool = false
 var _score: int = 0
 var _is_new_high_score: bool = false
+var _smoke_tex: Texture2D = preload("res://assets/particles/kenney_particle-pack/PNG (Transparent)/smoke_07.png")
+var _star_tex: Texture2D = preload("res://assets/particles/kenney_particle-pack/PNG (Transparent)/star_04.png")
 var _auto_advance_timer: SceneTreeTimer = null
 var _advanced: bool = false
+var _xp_earned: int = 0
+var _leveled_up: bool = false
+var _new_level: int = 1
 
 
 func _ready() -> void:
@@ -31,8 +38,12 @@ func _ready() -> void:
 	_was_boilover = _pot_luck_data.get("was_boilover", false) as bool
 	_bag_emptied = _pot_luck_data.get("bag_emptied", false) as bool
 	_score = GameManager.score
+	var previous_high: int = _pot_luck_data.get("previous_high_score", 0) as int
 	var high_score: int = SaveManager.get_value("high_score", 0) as int
-	_is_new_high_score = _score >= high_score and _score > 0
+	_is_new_high_score = _score > 0 and _score > previous_high
+	_xp_earned = _pot_luck_data.get("xp_earned", 0) as int
+	_leveled_up = _pot_luck_data.get("leveled_up", false) as bool
+	_new_level = _pot_luck_data.get("new_level", 1) as int
 
 	# Set up high score text
 	var was_daily: bool = _pot_luck_data.get("mode", "endless") == "daily"
@@ -46,7 +57,7 @@ func _ready() -> void:
 		_high_score_label.text = "Best: %s" % Utils.format_number(high_score)
 
 	# Hide elements initially for timed reveal
-	_score_header.modulate.a = 0.0
+	_score_banner.modulate.a = 0.0
 	_score_label.modulate.a = 0.0
 	_high_score_label.modulate.a = 0.0
 	_new_high_score_label.visible = false
@@ -109,13 +120,16 @@ func _play_perfect_pot() -> void:
 			_show_new_high_score_badge()
 		)
 
-	# 2.0s: Continue label
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+	# 1.5s: XP + level up
+	get_tree().create_timer(1.5).timeout.connect(_show_xp_and_level_up)
+
+	# 2.5s: Continue label
+	get_tree().create_timer(2.5).timeout.connect(func() -> void:
 		_show_continue()
 	)
 
-	# Auto-advance after 3.5s
-	_auto_advance_timer = get_tree().create_timer(3.5)
+	# Auto-advance after 4.0s (extended for level-up display)
+	_auto_advance_timer = get_tree().create_timer(4.0 if _leveled_up else 3.5)
 	_auto_advance_timer.timeout.connect(_advance_to_rewards)
 
 
@@ -146,19 +160,28 @@ func _play_served() -> void:
 			_show_new_high_score_badge()
 		)
 
-	# 2.0s: Continue label
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+	# 1.5s: XP + level up
+	get_tree().create_timer(1.5).timeout.connect(_show_xp_and_level_up)
+
+	# 2.5s: Continue label
+	get_tree().create_timer(2.5).timeout.connect(func() -> void:
 		_show_continue()
 	)
 
-	# Auto-advance after 3.5s
-	_auto_advance_timer = get_tree().create_timer(3.5)
+	# Auto-advance after 4.0s (extended for level-up display)
+	_auto_advance_timer = get_tree().create_timer(4.0 if _leveled_up else 3.5)
 	_auto_advance_timer.timeout.connect(_advance_to_rewards)
 
 
 # ── BOILOVER VFX ──────────────────────────────────────────────────────────
 
 func _play_boilover() -> void:
+	# Swap to boilover background art
+	var boilover_tex: Texture2D = load("res://assets/sprites/Gemini_Generated_Image_cczvgwcczvgwcczv.png") as Texture2D
+	if boilover_tex:
+		_background_art.texture = boilover_tex
+		_background_art.modulate.a = 0.25
+
 	# 0.0s: Dark red background tint (strong shift)
 	var bg_tween: Tween = create_tween()
 	bg_tween.tween_property(_background, "color", Color(0.2, 0.04, 0.03), 0.8) \
@@ -188,7 +211,7 @@ func _play_boilover() -> void:
 
 	# 0.5s: Score slam to "0" immediately (no count-up)
 	get_tree().create_timer(0.5).timeout.connect(func() -> void:
-		_score_header.modulate.a = 1.0
+		_score_banner.modulate.a = 1.0
 		_score_label.text = "0"
 		_score_label.modulate.a = 1.0
 		Juice.slam_in(_score_label, 0.3)
@@ -197,13 +220,16 @@ func _play_boilover() -> void:
 	# 1.0s: High score fade in
 	_fade_in_node(_high_score_label, 0.2, 1.0)
 
-	# 2.0s: Continue label
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+	# 1.3s: XP (even on boilover, consolation XP)
+	get_tree().create_timer(1.3).timeout.connect(_show_xp_and_level_up)
+
+	# 2.5s: Continue label
+	get_tree().create_timer(2.5).timeout.connect(func() -> void:
 		_show_continue()
 	)
 
-	# Auto-advance after 3.5s
-	_auto_advance_timer = get_tree().create_timer(3.5)
+	# Auto-advance after 4.0s (extended for level-up display)
+	_auto_advance_timer = get_tree().create_timer(4.0 if _leveled_up else 3.5)
 	_auto_advance_timer.timeout.connect(_advance_to_rewards)
 
 
@@ -221,9 +247,9 @@ func _reveal_score_countup() -> void:
 	_score_header.modulate.a = 0.0
 	_score_label.modulate.a = 1.0
 
-	# Fade in header
+	# Fade in score banner
 	var header_tween: Tween = create_tween()
-	header_tween.tween_property(_score_header, "modulate:a", 1.0, 0.2)
+	header_tween.tween_property(_score_banner, "modulate:a", 1.0, 0.2)
 
 	# Count up score
 	if _score > 0:
@@ -258,6 +284,67 @@ func _shake_ui(intensity: float, duration: float) -> void:
 		var offset: Vector2 = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized() * step_intensity
 		tween.tween_property(safe_area, "position", original_pos + offset, 0.05)
 	tween.tween_property(safe_area, "position", original_pos, 0.05)
+
+
+func _show_xp_and_level_up() -> void:
+	var xp_safe_area: MarginContainer = %SafeArea
+
+	if _xp_earned > 0:
+		# "+X XP" floating text
+		var xp_label: Label = Label.new()
+		xp_label.text = "+%d XP" % _xp_earned
+		xp_label.add_theme_font_size_override("font_size", 32)
+		xp_label.add_theme_color_override("font_color", Color(0.9, 0.75, 0.3))
+		xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		xp_label.set_anchors_preset(Control.PRESET_CENTER)
+		xp_label.offset_top = 80
+		xp_label.offset_bottom = 120
+		xp_label.offset_left = -100
+		xp_label.offset_right = 100
+		xp_safe_area.add_child(xp_label)
+
+		# Float up + fade
+		xp_label.modulate.a = 0.0
+		var xp_tween: Tween = create_tween()
+		xp_tween.tween_property(xp_label, "modulate:a", 1.0, 0.2)
+		xp_tween.tween_property(xp_label, "offset_top", xp_label.offset_top - 30.0, 1.0) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	if _leveled_up:
+		# Show LEVEL UP! with slam_in
+		await get_tree().create_timer(0.5).timeout
+		var level_label: Label = Label.new()
+		level_label.text = "LEVEL UP!"
+		level_label.add_theme_font_size_override("font_size", 48)
+		level_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.0))
+		level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		level_label.set_anchors_preset(Control.PRESET_CENTER)
+		level_label.offset_top = 130
+		level_label.offset_bottom = 190
+		level_label.offset_left = -150
+		level_label.offset_right = 150
+		xp_safe_area.add_child(level_label)
+		Juice.slam_in(level_label, 0.35)
+
+		# Chef Level X subtitle
+		var sublabel: Label = Label.new()
+		sublabel.text = "Chef Level %d" % _new_level
+		sublabel.add_theme_font_size_override("font_size", 28)
+		sublabel.add_theme_color_override("font_color", Color(0.9, 0.75, 0.3))
+		sublabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sublabel.set_anchors_preset(Control.PRESET_CENTER)
+		sublabel.offset_top = 185
+		sublabel.offset_bottom = 220
+		sublabel.offset_left = -120
+		sublabel.offset_right = 120
+		xp_safe_area.add_child(sublabel)
+		sublabel.modulate.a = 0.0
+		var sub_tween: Tween = create_tween()
+		sub_tween.tween_interval(0.2)
+		sub_tween.tween_property(sublabel, "modulate:a", 1.0, 0.25)
+
+		_flash_screen(Color(1.0, 0.85, 0.0), 0.3)
+		_shake_ui(10.0, 0.2)
 
 
 func _show_continue() -> void:
@@ -310,8 +397,9 @@ func _spawn_confetti_particles() -> void:
 	burst.position = Vector2(size.x / 2.0, size.y * 0.4)
 	_vfx_layer.add_child(burst)
 
-	# Sparkle layer — smaller bright dots
+	# Sparkle layer — star particles
 	var sparkles: CPUParticles2D = CPUParticles2D.new()
+	sparkles.texture = _star_tex
 	sparkles.emitting = true
 	sparkles.one_shot = false
 	sparkles.amount = 25
@@ -322,8 +410,8 @@ func _spawn_confetti_particles() -> void:
 	sparkles.initial_velocity_min = 50.0
 	sparkles.initial_velocity_max = 180.0
 	sparkles.gravity = Vector2(0, 100)
-	sparkles.scale_amount_min = 3.0
-	sparkles.scale_amount_max = 6.0
+	sparkles.scale_amount_min = 0.04
+	sparkles.scale_amount_max = 0.08
 	sparkles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	sparkles.emission_rect_extents = Vector2(size.x * 0.4, 10)
 	sparkles.color = Color(1.0, 1.0, 0.8, 0.9)
@@ -415,6 +503,7 @@ func _spawn_ember_particles() -> void:
 
 func _spawn_smoke_particles() -> void:
 	var smoke: CPUParticles2D = CPUParticles2D.new()
+	smoke.texture = _smoke_tex
 	smoke.emitting = true
 	smoke.one_shot = false
 	smoke.amount = 12
@@ -425,8 +514,8 @@ func _spawn_smoke_particles() -> void:
 	smoke.initial_velocity_min = 20.0
 	smoke.initial_velocity_max = 60.0
 	smoke.gravity = Vector2(0, -10)
-	smoke.scale_amount_min = 16.0
-	smoke.scale_amount_max = 30.0
+	smoke.scale_amount_min = 0.15
+	smoke.scale_amount_max = 0.3
 	smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
 	smoke.emission_rect_extents = Vector2(size.x * 0.3, 30)
 	smoke.color = Color(0.15, 0.1, 0.08, 0.4)

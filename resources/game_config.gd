@@ -62,3 +62,11 @@ extends Resource
 @export var clean_pot_bonus: float = 1.5
 ## Heat target ratio after second chance (0.7 = set heat to 70% of threshold)
 @export var second_chance_heat_reduction: float = 0.7
+## Minimum heat budget ratio for balanced bag generation (level 1)
+@export var heat_budget_ratio_min: float = 1.05
+## Maximum heat budget ratio for balanced bag generation (level cap)
+@export var heat_budget_ratio_max: float = 1.35
+## Chef level at which heat budget ratio reaches its max
+@export var heat_budget_level_cap: int = 50
+## Heat reduction amount for Cool Down ability
+@export var cool_down_amount: float = 0.10

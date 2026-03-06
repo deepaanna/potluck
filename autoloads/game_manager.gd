@@ -21,6 +21,10 @@ var score: int = 0
 var level: int = 1
 var config: GameConfig
 
+# Progression state
+var chef_level: int = 1
+var chef_xp: int = 0
+
 # Push-your-luck run state
 var current_heat: float = 0.0
 var ingredients_pulled: int = 0
@@ -65,6 +69,7 @@ func change_state(new_state: GameState) -> bool:
 func start_game() -> void:
 	score = 0
 	level = 1
+	_load_progression()
 	score_changed.emit(score)
 	reset_run()
 	change_state(GameState.PLAYING)
@@ -123,6 +128,73 @@ func end_game() -> void:
 	SaveManager.set_value("total_score", total_score + score)
 
 	change_state(GameState.GAME_OVER)
+
+
+## Award XP for a completed round. Returns result dictionary.
+## round_data: { was_boilover, final_score, combos_count, bag_emptied, new_recipes_count }
+func award_xp(round_data: Dictionary) -> Dictionary:
+	var xp_earned: int = ProgressionManager.calculate_xp(round_data)
+	var old_level: int = chef_level
+
+	chef_xp += xp_earned
+
+	# Level up loop
+	var leveled_up: bool = false
+	while chef_xp >= ProgressionManager.xp_for_level(chef_level):
+		chef_xp -= ProgressionManager.xp_for_level(chef_level)
+		chef_level += 1
+		leveled_up = true
+
+	# Check unlocks
+	var unlocks: Array[Dictionary] = ProgressionManager.check_unlocks(old_level, chef_level)
+
+	# Update cuisine unlocks
+	_sync_cuisine_unlocks()
+
+	# Update abilities unlocked
+	var abilities: Array[String] = ProgressionManager.get_unlocked_abilities(chef_level)
+	SaveManager.set_value("pot_luck.abilities_unlocked", abilities)
+
+	# Persist
+	_save_progression()
+
+	# Track stats
+	var total_xp: int = SaveManager.get_value("pot_luck.stats.total_xp_earned", 0) as int
+	SaveManager.set_value("pot_luck.stats.total_xp_earned", total_xp + xp_earned)
+	if chef_level > (SaveManager.get_value("pot_luck.stats.highest_level_reached", 1) as int):
+		SaveManager.set_value("pot_luck.stats.highest_level_reached", chef_level)
+
+	return {
+		"xp_earned": xp_earned,
+		"leveled_up": leveled_up,
+		"old_level": old_level,
+		"new_level": chef_level,
+		"current_xp": chef_xp,
+		"xp_for_next": ProgressionManager.xp_for_level(chef_level),
+		"unlocks": unlocks,
+	}
+
+
+func _load_progression() -> void:
+	chef_level = SaveManager.get_value("pot_luck.chef_level", 1) as int
+	chef_xp = SaveManager.get_value("pot_luck.chef_xp", 0) as int
+
+
+func _save_progression() -> void:
+	SaveManager.set_value("pot_luck.chef_level", chef_level)
+	SaveManager.set_value("pot_luck.chef_xp", chef_xp)
+
+
+func _sync_cuisine_unlocks() -> void:
+	var cuisines: Array[String] = ProgressionManager.get_unlocked_cuisines(chef_level)
+	var current: Array = SaveManager.get_value("pot_luck.unlocked_cuisines", ["basic"]) as Array
+	var changed: bool = false
+	for c: String in cuisines:
+		if c not in current:
+			current.append(c)
+			changed = true
+	if changed:
+		SaveManager.set_value("pot_luck.unlocked_cuisines", current)
 
 
 ## Change the current scene with a fade transition (fire-and-forget)
